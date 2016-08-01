@@ -46,7 +46,7 @@ class repository_googledocs_observer {
         $course = $DB->get_record('course', array('id' => $courseid));
         $repo = self::get_google_docs_repo();
         switch($event->eventname) {
-            case '\core\event\course_updated':
+            /**case '\core\event\course_updated':
                 $usersemails = self::get_google_authenticated_users($courseid);
                 $resources  = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
@@ -90,7 +90,21 @@ class repository_googledocs_observer {
                 foreach($usersemails as $email) {
                     self::remove_permission($repo, $fileid, $email);
                 }
+                break;*/
+            case '\core\event\group_member_added':
+                $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
+                $email = self::get_google_authenticated_users_email($event->relateduserid);
+                foreach ($resources as $fileid) {
+                    $repo->insert_permission($fileid, $email, 'user', 'reader');
+                }
                 break;
+            /**case '\core\event\group_member_removed':
+                $resources = self::get_resources($courseid, null, $event->objectid);
+                $email = self::get_google_authenticated_users_email($event->relateduserid);
+                foreach ($resources as $fileid) {
+                    self::remove_permission($repo, $fileid, $email);
+                }
+                break;*/
         }
         return true;
     }
@@ -101,7 +115,7 @@ class repository_googledocs_observer {
     }
 
 
-    private static function get_resources($courseid, $contextinstanceid=null) {
+    private static function get_resources($courseid, $contextinstanceid=null, $groupid=null, $userid=null) {
         global $DB;
         $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'));
         $id = $googledocsrepo->id;
@@ -124,9 +138,18 @@ class repository_googledocs_observer {
        foreach ($filerecords as $filerecord) {
            $docid = $filerecord->reference;
            list($context, $course, $cm) = get_context_info_array($filerecord->contextid);
-           if($course->id == $courseid && is_null($contextinstanceid) or
-              $course->id == $courseid && $cm->id == $contextinstanceid) {
-               $resources[] = $docid;
+           if (is_null($groupid)) {
+               if($course->id == $courseid && $cm->visible == 1 && is_null($contextinstanceid) or
+                  $course->id == $courseid && $cm->visible == 1 && $cm->id == $contextinstanceid) {
+                      $resources[] = $docid;
+               }
+           }
+           else {
+               $modinfo = get_fast_modinfo($courseid, $userid);
+               $cmod = $modinfo->get_cm($cm->id);
+               if ($course->id == $courseid && $cm->visible == 1 && $cmod->uservisible) {
+                   $resources[] = $docid;
+               }
            }
        }
        return $resources;
