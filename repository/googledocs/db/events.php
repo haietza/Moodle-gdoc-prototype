@@ -27,6 +27,10 @@ $observers = array (
     array (
         'eventname'   => '\core\event\role_unassigned',
         'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\group_member_added',
+        'callback'    => $callback
     )
 
 );
