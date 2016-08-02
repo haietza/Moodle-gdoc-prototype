@@ -29,7 +29,23 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\core\event\group_deleted',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\group_member_added',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\group_member_removed',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\grouping_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\grouping_updated',
         'callback'    => $callback
     )
 

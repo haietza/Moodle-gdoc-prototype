@@ -46,7 +46,7 @@ class repository_googledocs_observer {
         $course = $DB->get_record('course', array('id' => $courseid));
         $repo = self::get_google_docs_repo();
         switch($event->eventname) {
-            case '\core\event\course_updated':
+            /**case '\core\event\course_updated':
                 $usersemails = self::get_google_authenticated_users($courseid);
                 $resources  = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
@@ -90,7 +90,7 @@ class repository_googledocs_observer {
                 foreach($usersemails as $email) {
                     self::remove_permission($repo, $fileid, $email);
                 }
-                break;
+                break;*/
             case '\core\event\group_member_added':
                 $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
