@@ -17,7 +17,7 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\core\event\course_module_delted',
+        'eventname'   => '\core\event\course_module_deleted',
         'callback'    => $callback
     ),
     array (

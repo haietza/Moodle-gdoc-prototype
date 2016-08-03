@@ -46,7 +46,7 @@ class repository_googledocs_observer {
         $course = $DB->get_record('course', array('id' => $courseid));
         $repo = self::get_google_docs_repo();
         switch($event->eventname) {
-            /**case '\core\event\course_updated':
+            case '\core\event\course_updated':
                 $usersemails = self::get_google_authenticated_users($courseid);
                 $resources  = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
@@ -90,7 +90,7 @@ class repository_googledocs_observer {
                 foreach($usersemails as $email) {
                     self::remove_permission($repo, $fileid, $email);
                 }
-                break;*/
+                break;
             case '\core\event\group_member_added':
                 $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
@@ -99,7 +99,7 @@ class repository_googledocs_observer {
                 }
                 break;
             case '\core\event\group_member_removed':
-                $resources = self::get_resources($courseid, null, $event->objectid);
+                $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
                 foreach ($resources as $fileid) {
                     self::remove_permission($repo, $fileid, $email);
@@ -113,7 +113,6 @@ class repository_googledocs_observer {
         $permissionid = $repo->print_permission_id_for_email($email);
         $repo->remove_permission($fileid, $permissionid);
     }
-
 
     private static function get_resources($courseid, $contextinstanceid=null, $groupid=null, $userid=null) {
         global $DB;
@@ -139,8 +138,8 @@ class repository_googledocs_observer {
            $docid = $filerecord->reference;
            list($context, $course, $cm) = get_context_info_array($filerecord->contextid);
            if (is_null($groupid)) {
-               if($course->id == $courseid && $cm->visible == 1 && is_null($contextinstanceid) or
-                  $course->id == $courseid && $cm->visible == 1 && $cm->id == $contextinstanceid) {
+               if($course->id == $courseid && is_null($contextinstanceid) or
+                  $course->id == $courseid && $cm->id == $contextinstanceid) {
                       $resources[] = $docid;
                }
            }
