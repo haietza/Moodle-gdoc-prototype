@@ -46,7 +46,7 @@ class repository_googledocs extends repository {
 
     /**
      * Google Drive Service.
-     * @var Google_Drive_Service
+     * @var Google_Service_Drive
      */
     private $service = null;
 
@@ -729,6 +729,16 @@ class repository_googledocs extends repository {
          print"User is not permitted to access the resource.<br/>";
         //print "An error occurred: " . $e->getMessage();
      }
+   }
+   
+   function print_permission_role($fileId, $permissionId) {
+       try {
+           $permission = $this->service->permissions->get($fileId, $permissionId);
+           return $permission->getRole();
+       } catch (Exception $e) {
+           print "An error occurred: " . $e->getMessage();
+       }
+       return NULL;
    }
 
    /**

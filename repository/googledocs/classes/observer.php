@@ -43,25 +43,81 @@ class repository_googledocs_observer {
     public static function manage_resources($event) {
         global $DB;
         $repo = self::get_google_docs_repo();
+        $courseid = $event->courseid;
         switch($event->eventname) {
-            case '\core\event\course_updated':
-                $courseid = $event->courseid;
-                $course = $DB->get_record('course', array('id' => $courseid));
+            case '\core\event\course_module_created':
+            case '\core\event\course_module_updated':
+                $cmid = $event->contextinstanceid;
                 $userids = self::get_google_authenticated_userids($courseid);
                 foreach ($userids as $userid) {
+                    $email = self::get_google_authenticated_users_email($userid);
                     $modinfo = get_fast_modinfo($courseid, $userid);
-                    $cms = $modinfo->cms;
-                    foreach ($cms as $cm) {
-                        if ($cm->modname == 'resource') {
-                            $fileId = self::get_resource($cm->id);
-                            if ($cm->uservisible) {
-                                // Test for existing permission; if fails: NEED GMAIL for email
-                                $repo->insert_permission($fileId, $email,  'user', 'reader');
+                    $cm = $modinfo->get_cm($cmid);
+                    if ($event->other['modulename'] == 'resource') {
+                        $fileId = self::get_resource($cmid);
+                        if ($cm->uservisible && !is_null($fileId)) {
+                            // Will need to modify to check for roles and assign permissions accordingly
+                            $permissionid = $repo->print_permission_id_for_email($email);
+                            try {
+                                $permissionrole = $repo->print_permission_role($fileId, $permissionid);
+                                if (is_null($permissionrole)) {
+                                        $repo->insert_permission($fileId, $email,  'user', 'reader');
+                                 }
+                            } catch (Exception $e) {
+                                print "An error occurred: " . $e->getMessage();
                             }
-                            else {
-                                // Test for existing permission; if passes:
+                        }
+                        elseif (!is_null($fileId)) {
+                            // Will need to modify to check for roles and remove permissions accordingly
+                            $permissionid = $repo->print_permission_id_for_email($email);
+                            try {
+                                $permissionrole = $repo->print_permission_role($fileId, $permissionid);
+                                if ($permissionrole == 'reader' || $permissionrole == 'writer') {
+                                        $repo->remove_permission($fileId, $permissionid);
+                                }
+                            } catch (Exception $e) {
+                                print "An error occurred: " . $e->getMessage();
+                            }
+                        }
+                    }
+                }
+                break;
+            /**
+            // Need to modify event handler for course updates (i.e. visibility, etc) - this only handles course modules
+            case '\core\event\course_updated':
+                $courseid = $event->courseid;
+                $userids = self::get_google_authenticated_userids($courseid);
+                foreach ($userids as $userid) {
+                    $email = self::get_google_authenticated_users_email($userid);
+                    $modinfo = get_fast_modinfo($courseid, $userid);
+                    $cms = $modinfo->get_cms();
+                    foreach ($cms as $cm) {
+                        if ($cm->get_module_type_name() == 'resource') {
+                            $fileId = self::get_resource($cm->id);
+                            if ($cm->uservisible && !is_null($fileId)) {
+                                // Will need to modify to check for roles and assign permissions accordingly
                                 $permissionid = $repo->print_permission_id_for_email($email);
-                                $repo->remove_permission($fileId, $permissionid);
+                                try {
+                                    $permission = $this->service->permissions->get($fileId, $permissionid);
+                                    if ($permission->getRole() != 'owner' || $permission->getRole() != 'reader'
+                                        || $permission->getRole() != 'writer') {
+                                            $repo->insert_permission($fileId, $email,  'user', 'reader');
+                                    }
+                                } catch (Exception $e) {
+                                    print "An error occurred: " . $e->getMessage();
+                                }
+                            }
+                            elseif (!is_null($fileId)) {
+                                // Will need to modify to check for roles and remove permissions accordingly
+                                $permissionid = $repo->print_permission_id_for_email($email);
+                                try {
+                                    $permission = $this->service->permissions->get($fileId, $permissionid);
+                                    if ($permission->getRole() == 'reader' || $permission->getRole() == 'writer') {
+                                        $repo->remove_permission($fileId, $permissionid);
+                                    }
+                                } catch (Exception $e) {
+                                    print "An error occurred: " . $e->getMessage();
+                                }
                             }
                         }
                     }
@@ -119,6 +175,7 @@ class repository_googledocs_observer {
             case '\core\event\grouping_updated':
                 $groupingid = $event->objectid;
                 break;
+                */
         }
         return true;
     }
@@ -182,8 +239,8 @@ class repository_googledocs_observer {
                 AND f.referencefileid IS NOT NULL
                 AND not (f.component = :component and f.filearea = :filearea)";
         
-        $filerecord = $DB->get_recordset_sql($sql, array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
-        return $filerecord;
+        $filerecord = $DB->get_record_sql($sql, array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
+        return $filerecord->reference;
     }
 
     private static function get_resource_id($courseid, $contextinstanceid) {
@@ -240,5 +297,4 @@ class repository_googledocs_observer {
         $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'));
         return new repository_googledocs($googledocsrepo->id);
     }
-
 }
