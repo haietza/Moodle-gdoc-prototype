@@ -730,16 +730,6 @@ class repository_googledocs extends repository {
         //print "An error occurred: " . $e->getMessage();
      }
    }
-   
-   function print_permission_role($fileId, $permissionId) {
-       try {
-           $permission = $this->service->permissions->get($fileId, $permissionId);
-           return $permission->getRole();
-       } catch (Exception $e) {
-           print "An error occurred: " . $e->getMessage();
-       }
-       return NULL;
-   }
 
    /**
     * Insert a new permission.
