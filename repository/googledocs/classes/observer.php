@@ -34,7 +34,7 @@ require_once($CFG->dirroot . '/repository/googledocs/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class repository_googledocs_observer {
-
+    
     /**
      * Sync google resource permissions based on various events.
      *
@@ -44,95 +44,34 @@ class repository_googledocs_observer {
         global $DB;
         $repo = self::get_google_docs_repo();
         $courseid = $event->courseid;
+        $course = $DB->get_record('course', array ('id'=>$courseid));
+        
+        $catsql = "SELECT cc.id
+                  FROM {course_categories} cc
+                  LEFT JOIN {course} c
+                       ON cc.id = c.category
+                 WHERE c.id = :courseid";
+        $category = $DB->get_recordset_sql($catsql, array('courseid' => $courseid));
+        
         switch($event->eventname) {
             case '\core\event\course_module_created':
             case '\core\event\course_module_updated':
-                $cmid = $event->contextinstanceid;
+                $cmids = ([$event->contextinstanceid]);
                 $userids = self::get_google_authenticated_userids($courseid);
-                foreach ($userids as $userid) {
-                    $email = self::get_google_authenticated_users_email($userid);
-                    $modinfo = get_fast_modinfo($courseid, $userid);
-                    $cm = $modinfo->get_cm($cmid);
-                    if ($event->other['modulename'] == 'resource') {
-                        $fileId = self::get_resource($cmid);
-                        if ($cm->uservisible && !is_null($fileId)) {
-                            // Will need to modify to check for roles and assign permissions accordingly
-                            $permissionid = $repo->print_permission_id_for_email($email);
-                            try {
-                                $permissionrole = $repo->print_permission_role($fileId, $permissionid);
-                                if (is_null($permissionrole)) {
-                                        $repo->insert_permission($fileId, $email,  'user', 'reader');
-                                 }
-                            } catch (Exception $e) {
-                                print "An error occurred: " . $e->getMessage();
-                            }
-                        }
-                        elseif (!is_null($fileId)) {
-                            // Will need to modify to check for roles and remove permissions accordingly
-                            $permissionid = $repo->print_permission_id_for_email($email);
-                            try {
-                                $permissionrole = $repo->print_permission_role($fileId, $permissionid);
-                                if ($permissionrole == 'reader' || $permissionrole == 'writer') {
-                                        $repo->remove_permission($fileId, $permissionid);
-                                }
-                            } catch (Exception $e) {
-                                print "An error occurred: " . $e->getMessage();
-                            }
-                        }
-                    }
+                if ($event->other['modulename'] == 'resource' || $event->other['modulename'] == 'folder') {
+                    self::update_course_modules($repo, $courseid, $cmids, $userids);
                 }
                 break;
-            /**
-            // Need to modify event handler for course updates (i.e. visibility, etc) - this only handles course modules
             case '\core\event\course_updated':
-                $courseid = $event->courseid;
-                $userids = self::get_google_authenticated_userids($courseid);
-                foreach ($userids as $userid) {
-                    $email = self::get_google_authenticated_users_email($userid);
-                    $modinfo = get_fast_modinfo($courseid, $userid);
-                    $cms = $modinfo->get_cms();
-                    foreach ($cms as $cm) {
-                        if ($cm->get_module_type_name() == 'resource') {
-                            $fileId = self::get_resource($cm->id);
-                            if ($cm->uservisible && !is_null($fileId)) {
-                                // Will need to modify to check for roles and assign permissions accordingly
-                                $permissionid = $repo->print_permission_id_for_email($email);
-                                try {
-                                    $permission = $this->service->permissions->get($fileId, $permissionid);
-                                    if ($permission->getRole() != 'owner' || $permission->getRole() != 'reader'
-                                        || $permission->getRole() != 'writer') {
-                                            $repo->insert_permission($fileId, $email,  'user', 'reader');
-                                    }
-                                } catch (Exception $e) {
-                                    print "An error occurred: " . $e->getMessage();
-                                }
-                            }
-                            elseif (!is_null($fileId)) {
-                                // Will need to modify to check for roles and remove permissions accordingly
-                                $permissionid = $repo->print_permission_id_for_email($email);
-                                try {
-                                    $permission = $this->service->permissions->get($fileId, $permissionid);
-                                    if ($permission->getRole() == 'reader' || $permission->getRole() == 'writer') {
-                                        $repo->remove_permission($fileId, $permissionid);
-                                    }
-                                } catch (Exception $e) {
-                                    print "An error occurred: " . $e->getMessage();
-                                }
-                            }
-                        }
-                    }
+                if ($course->visible == 1) {
+                    
+                }
+                else {
+                    
                 }
                 break;
-            case '\core\event\course_module_created':
-            case '\core\event\course_module_updated':
-                $fileid = self::get_resource_id($courseid, $event->contextinstanceid);
-                $usersemails = self::get_google_authenticated_users($courseid);
-                foreach($usersemails as $email) {
-                    if($course->visible == 1) {
-                        $repo->insert_permission($fileid, $email, 'user', 'reader');
-                    }
-                }
-                break;
+            
+            /**
             case '\core\event\role_assigned':
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
                 $resources  = self::get_resources($courseid);
@@ -184,6 +123,34 @@ class repository_googledocs_observer {
         $permissionid = $repo->print_permission_id_for_email($email);
         $repo->remove_permission($fileid, $permissionid);
     }
+    
+    private static function update_course_modules($repo, $courseid, $cmids, $userids) {
+        foreach ($cmids as $cmid) {
+            foreach ($userids as $userid) {
+                $email = self::get_google_authenticated_users_email($userid);
+                $modinfo = get_fast_modinfo($courseid, $userid);
+                $cm = $modinfo->get_cm($cmid);
+                $fileId = self::get_resource($cmid);
+                if ($cm->uservisible && !is_null($fileId)) {
+                    // Will need to modify to check for roles and assign permissions accordingly
+                    try {
+                        $repo->insert_permission($fileId, $email,  'user', 'reader');
+                    } catch (Exception $e) {
+                        print "An error occurred: " . $e->getMessage();
+                    }
+                }
+                elseif (!is_null($fileId)) {
+                    // Will need to modify to check for roles and remove permissions accordingly
+                    $permissionid = $repo->print_permission_id_for_email($email);
+                    try {
+                        $repo->remove_permission($fileId, $permissionid);
+                    } catch (Exception $e) {
+                        print "An error occurred: " . $e->getMessage();
+                    }
+                }
+            }
+        }
+    }
 
     private static function get_resources($courseid, $contextinstanceid=null) {
         global $DB;
@@ -226,7 +193,7 @@ class repository_googledocs_observer {
             return;
         }
         
-        $sql = "SELECT r.reference
+        $sql = "SELECT DISTINCT r.reference
                 FROM {files_reference} r
                 LEFT JOIN {files} f
                 ON r.id = f.referencefileid
