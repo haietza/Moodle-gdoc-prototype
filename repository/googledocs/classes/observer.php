@@ -46,75 +46,30 @@ class repository_googledocs_observer {
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array ('id'=>$courseid));
         
-        $catsql = "SELECT cc.id
+        $catsql = "SELECT cc.*
                   FROM {course_categories} cc
                   LEFT JOIN {course} c
                        ON cc.id = c.category
                  WHERE c.id = :courseid";
-        $category = $DB->get_recordset_sql($catsql, array('courseid' => $courseid));
+        $category = $DB->get_record_sql($catsql, array('courseid' => $courseid));
         
         switch($event->eventname) {
             case '\core\event\course_module_created':
             case '\core\event\course_module_updated':
-                $cmids = ([$event->contextinstanceid]);
+                $cmid = ([$event->contextinstanceid]);
                 $userids = self::get_google_authenticated_userids($courseid);
                 if ($event->other['modulename'] == 'resource' || $event->other['modulename'] == 'folder') {
-                    self::update_course_modules($repo, $courseid, $cmids, $userids);
+                    self::update_course_modules($category, $course, $repo, $courseid, $cmid, $userids);
                 }
                 break;
             case '\core\event\course_updated':
                 if ($course->visible == 1) {
-                    
+                    // Update module permissions
                 }
                 else {
-                    
+                    // Remove module permissions
                 }
                 break;
-            
-            /**
-            case '\core\event\role_assigned':
-                $email = self::get_google_authenticated_users_email($event->relateduserid);
-                $resources  = self::get_resources($courseid);
-                foreach ($resources as $fileid) {
-                    $repo->insert_permission($fileid, $email, 'user', 'reader');
-                }
-                break;
-            case '\core\event\role_unassigned':
-                $email = self::get_google_authenticated_users_email($event->relateduserid);
-                $resources  = self::get_resources($courseid);
-                foreach ($resources as $fileid) {
-                    self::remove_permission($repo, $fileid, $email);
-                }
-                break;
-            case '\core\event\course_module_deleted':
-                $fileid = self::get_resource_id($courseid, $event->contextinstanceid);
-                $usersemails = self::get_google_authenticated_users($courseid);
-                foreach($usersemails as $email) {
-                    self::remove_permission($repo, $fileid, $email);
-                }
-                break;
-            case '\core\event\group_deleted':
-                break;
-            case '\core\event\group_member_added':
-                $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
-                $email = self::get_google_authenticated_users_email($event->relateduserid);
-                foreach ($resources as $fileid) {
-                    $repo->insert_permission($fileid, $email, 'user', 'reader');
-                }
-                break;
-            case '\core\event\group_member_removed':
-                $resources = self::get_resources($courseid, null, $event->objectid, $event->relateduserid);
-                $email = self::get_google_authenticated_users_email($event->relateduserid);
-                foreach ($resources as $fileid) {
-                    self::remove_permission($repo, $fileid, $email);
-                }
-                break;
-            case '\core\event\grouping_deleted':
-                break;
-            case '\core\event\grouping_updated':
-                $groupingid = $event->objectid;
-                break;
-                */
         }
         return true;
     }
@@ -124,63 +79,39 @@ class repository_googledocs_observer {
         $repo->remove_permission($fileid, $permissionid);
     }
     
-    private static function update_course_modules($repo, $courseid, $cmids, $userids) {
+    private static function update_course_modules($category, $course, $repo, $courseid, $cmids, $userids) {
         foreach ($cmids as $cmid) {
             foreach ($userids as $userid) {
                 $email = self::get_google_authenticated_users_email($userid);
                 $modinfo = get_fast_modinfo($courseid, $userid);
+                $sections = $modinfo->get_sections();
                 $cm = $modinfo->get_cm($cmid);
                 $fileId = self::get_resource($cmid);
-                if ($cm->uservisible && !is_null($fileId)) {
-                    // Will need to modify to check for roles and assign permissions accordingly
-                    try {
-                        $repo->insert_permission($fileId, $email,  'user', 'reader');
-                    } catch (Exception $e) {
-                        print "An error occurred: " . $e->getMessage();
-                    }
-                }
-                elseif (!is_null($fileId)) {
-                    // Will need to modify to check for roles and remove permissions accordingly
-                    $permissionid = $repo->print_permission_id_for_email($email);
-                    try {
-                        $repo->remove_permission($fileId, $permissionid);
-                    } catch (Exception $e) {
-                        print "An error occurred: " . $e->getMessage();
+                
+                foreach ($sections as $secnum=>$cms) {
+                    if (in_array($cmid, $cms)) {
+                        $section = $modinfo->get_section_info($secnum);
+                        if ($category->visible == 1 && $course->visible == 1 && $section->uservisible && $cm->uservisible && !is_null($fileId)) { 
+                            // Will need to modify to check for roles and assign permissions accordingly
+                            try {
+                                $repo->insert_permission($fileId, $email,  'user', 'reader');
+                            } catch (Exception $e) {
+                                print "An error occurred: " . $e->getMessage();
+                            }
+                        }
+                        else if (!is_null($fileId)) {
+                            // Will need to modify to check for roles and remove permissions accordingly
+                            $permissionid = $repo->print_permission_id_for_email($email);
+                            try {
+                                $repo->remove_permission($fileId, $permissionid);
+                            } catch (Exception $e) {
+                                print "An error occurred: " . $e->getMessage();
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    private static function get_resources($courseid, $contextinstanceid=null) {
-        global $DB;
-        $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'));
-        $id = $googledocsrepo->id;
-        if (empty($id)) {
-            // We did not find any instance of googledocs.
-            mtrace('Could not find any instance of the repository');
-            return;
-        }
-
-        $sql = "SELECT f.contextid, r.reference
-                  FROM {files_reference} r
-                  LEFT JOIN {files} f
-                       ON f.referencefileid = r.id
-                 WHERE r.repositoryid = :repoid
-                   AND f.referencefileid IS NOT NULL
-                   AND NOT (f.component = :component
-                            AND f.filearea = :filearea)";
-       $resources = array();
-       $filerecords = $DB->get_recordset_sql($sql, array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id));
-       foreach ($filerecords as $filerecord) {
-           $docid = $filerecord->reference;
-           list($context, $course, $cm) = get_context_info_array($filerecord->contextid);
-           if($course->id == $courseid && is_null($contextinstanceid) or
-               $course->id == $courseid && $cm->id == $contextinstanceid) {
-                   $resources[] = $docid;
-               }
-       }
-       return $resources;
     }
     
     private static function get_resource($cmid) {
@@ -210,34 +141,10 @@ class repository_googledocs_observer {
         return $filerecord->reference;
     }
 
-    private static function get_resource_id($courseid, $contextinstanceid) {
-        $resources  = self::get_resources($courseid, $contextinstanceid);
-        return current($resources);
-    }
-
     private static function get_google_authenticated_users_email($userid) {
         global $DB;
         $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid'=> $userid));
         return $googlerefreshtoken->gmail;
-    }
-
-    private static function get_google_authenticated_users($courseid) {
-        global $DB;
-        $sql = "SELECT DISTINCT grt.gmail
-                  FROM {user} eu1_u
-                  JOIN {google_refreshtokens} grt
-                        ON eu1_u.id = grt.userid
-                  JOIN {user_enrolments} eu1_ue
-                       ON eu1_ue.userid = eu1_u.id
-                  JOIN {enrol} eu1_e
-                       ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
-                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid ";
-        $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
-        $usersarray = array();
-        foreach($users as $user) {
-            $usersarray[] = $user->gmail;
-        }
-        return $usersarray;
     }
     
     private static function get_google_authenticated_userids($courseid) {
