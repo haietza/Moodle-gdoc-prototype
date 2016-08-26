@@ -21,6 +21,14 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\core\event\course_category_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_section_updated',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\role_assigned',
         'callback'    => $callback
     ),

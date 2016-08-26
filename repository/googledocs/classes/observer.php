@@ -45,39 +45,148 @@ class repository_googledocs_observer {
         $repo = self::get_google_docs_repo();
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array ('id'=>$courseid));
+        $category = self::get_category($courseid);
         
-        $catsql = "SELECT cc.*
-                  FROM {course_categories} cc
-                  LEFT JOIN {course} c
-                       ON cc.id = c.category
-                 WHERE c.id = :courseid";
-        $category = $DB->get_record_sql($catsql, array('courseid' => $courseid));
+        $userids = self::get_google_authenticated_userids($courseid);
+        $emails = self::get_google_authenticated_emails($courseid);
+        
+        $cms = self::get_course_modules($courseid);
+        $cmids = array();
+        foreach ($cms as $cm) {
+            $cmids[] = $cm->id;
+        }
         
         switch($event->eventname) {
-            case '\core\event\course_module_created':
-            case '\core\event\course_module_updated':
-                $cmid = ([$event->contextinstanceid]);
-                $userids = self::get_google_authenticated_userids($courseid);
-                if ($event->other['modulename'] == 'resource' || $event->other['modulename'] == 'folder') {
-                    self::update_course_modules($category, $course, $repo, $courseid, $cmid, $userids);
+            case '\core\event\course_category_updated':
+                if ($event->objectid == $category->id) {
+                    if ($category->visible == 1) {
+                        if ($course->visible == 1) {
+                            foreach ($userids as $userid) {
+                                
+                            }
+                            // For each user
+                                // For each course module
+                                    // If course module uservisible
+                                        // If section not restricted
+                                            // Insert permission
+                        }
+                    }
+                    else {
+                        // For each course module
+                        foreach ($cmids as $cmid) {
+                            // For each user
+                            foreach ($userids as $userid) {
+                                // Remove permission
+                                self::remove_cm_permission($cmid, $userid, $courseid, $repo);
+                            }
+                        }
+                    }
                 }
                 break;
             case '\core\event\course_updated':
                 if ($course->visible == 1) {
-                    // Update module permissions
+                    // If category->visible == 1
+                        // For each user
+                            // For each course module
+                                // If course module is uservisible
+                                    // If section not restricted
+                                        // Insert permission
                 }
                 else {
-                    // Remove module permissions
+                    // For each course module
+                    foreach ($cmids as $cmid) {
+                        // For each user
+                        foreach ($userids as $userid) {
+                            // Remove permission
+                            self::remove_cm_permission($cmid, $userid, $courseid, $repo);
+                        }
+                    }
+                }
+                break;
+            case '\core\event\course_section_updated':
+                if ($section->uservisible) {
+                    // If section not restricted
+                        // For each user
+                            // For each course module
+                                // If course module is uservisible
+                                    // Insert permission
+                }
+                else {
+                    // For each user
+                        // For each course module in section
+                            // Remove permission
+                }
+                break;
+            case '\core\event\course_module_created':
+            case '\core\event\course_module_updated':
+                $cmid = $event->contextinstanceid;
+                $fileid = self::get_resource($cmid);
+                if ($event->other['modulename'] == 'resource' && !is_null($fileid)) { 
+                    if ($category->visible == 1 && $course->visible == 1) {
+                        foreach ($userids as $userid) {
+                            // if cminfo->uservisible
+                                // If section not restricted (don't check for visibility though)
+                                    // Insert permission
+                        }
+                    }
+                    else {
+                        // For each user
+                        foreach ($userids as $userid) {
+                            // Remove permission
+                            self::remove_cm_permission($cmid, $userid, $courseid, $repo);
+                        }
+                    }
                 }
                 break;
         }
         return true;
     }
 
-    private static function remove_permission($repo, $fileid, $email) {
-        $permissionid = $repo->print_permission_id_for_email($email);
-        $repo->remove_permission($fileid, $permissionid);
+    //private static function remove_permission($repo, $fileid, $email) {
+        //$permissionid = $repo->print_permission_id_for_email($email);
+        //$repo->remove_permission($fileid, $permissionid);
+    //}
+    
+    // Get category database record for course
+    private static function get_category($courseid) {
+        global $DB;
+        $catsql = "SELECT cc.*
+                   FROM {course_categories} cc
+                   LEFT JOIN {course} c
+                        ON cc.id = c.category
+                   WHERE c.id = :courseid";
+        $category = $DB->get_record_sql($catsql, array('courseid' => $courseid));
+        return $category;
     }
+    
+    private static function get_course_modules($courseid) {
+        global $DB;
+        $cmssql = "SELECT *
+                   FROM {course_modules}
+                   WHERE id = :courseid
+                   AND module = :moduleid";
+        $moduleid = $DB->get_record('modules', array('name' => 'resource'), 'id');
+        $cms = $DB->get_records_sql($cmssql, array('courseid' => $courseid, 'moduleid' => $moduleid->id));
+    }
+    
+    private static function insert_cm_permission() {
+        
+    }
+    
+    // Remove permission for specified user for specified module
+    private static function remove_cm_permission($cmid, $userid, $courseid, $repo) {
+        $email = self::get_google_authenticated_users_email($userid);
+        $fileid = self::get_resource($cmid);
+        if (!is_null($fileid)) {
+            try {
+                $permissionid = $repo->print_permission_id_for_email($email);
+                $repo->remove_permission($fileid, $permissionid);
+            } catch (Exception $e) {
+                print "An error occurred: " . $e->getMessage();
+            }
+        }
+    }
+    
     
     private static function update_course_modules($category, $course, $repo, $courseid, $cmids, $userids) {
         foreach ($cmids as $cmid) {
@@ -145,6 +254,25 @@ class repository_googledocs_observer {
         global $DB;
         $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid'=> $userid));
         return $googlerefreshtoken->gmail;
+    }
+    
+    private static function get_google_authenticated_emails($courseid) {
+        global $DB;
+        $sql = "SELECT DISTINCT grt.gmail
+                  FROM {google_refreshtokens} grt
+                  JOIN {user} eu1_u
+                       ON eu1_u.id = grt.userid
+                  JOIN {user_enrolments} eu1_ue
+                       ON eu1_ue.userid = eu1_u.id
+                  JOIN {enrol} eu1_e
+                       ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
+                 WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid ";
+        $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
+        $usersarray = array();
+        foreach($users as $user) {
+            $usersarray[] = $user->gmail;
+        }
+        return $usersarray;
     }
     
     private static function get_google_authenticated_userids($courseid) {
