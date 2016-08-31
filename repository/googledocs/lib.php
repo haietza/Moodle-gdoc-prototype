@@ -637,11 +637,15 @@ class repository_googledocs extends repository {
     private function delete_refresh_token() {
         global $DB, $USER;
         $DB->delete_records('google_refreshtokens', array ('userid'=>$USER->id));
+        
+        // Trigger event.
+        \core\event\user_updated::create_from_userid($USER->id)->trigger();
     }
-
-    public function get_name() {
-        return 'repository_googledocs';
-    }
+    
+    //public function get_name() {
+    //    get_string('pluginname', 'repository_googledocs');
+    //}
+    
     /**
      * Saves the refresh token to database.
      *
@@ -667,6 +671,9 @@ class repository_googledocs extends repository {
                 $DB->insert_record('google_refreshtokens', $newdata);
             }
         }
+        
+        // Trigger event.
+        \core\event\user_updated::create_from_userid($USER->id)->trigger();
     }
 
     /**

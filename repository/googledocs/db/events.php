@@ -5,7 +5,19 @@ $callback = 'repository_googledocs_observer::manage_resources';
 $observers = array (
 
     array (
+        'eventname'   => '\core\event\course_category_updated',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\course_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_content_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_section_updated',
         'callback'    => $callback
     ),
     array (
@@ -18,14 +30,6 @@ $observers = array (
     ),
     array (
         'eventname'   => '\core\event\course_module_deleted',
-        'callback'    => $callback
-    ),
-    array (
-        'eventname'   => '\core\event\course_category_updated',
-        'callback'    => $callback
-    ),
-    array (
-        'eventname'   => '\core\event\course_section_updated',
         'callback'    => $callback
     ),
     array (
@@ -56,6 +60,4 @@ $observers = array (
         'eventname'   => '\core\event\grouping_updated',
         'callback'    => $callback
     )
-
 );
-

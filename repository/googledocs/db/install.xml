@@ -4,10 +4,10 @@
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="google_refreshtokens" COMMENT="Default comment for repository_googledocs, please edit me">
+    <TABLE NAME="google_refreshtokens" COMMENT="Store userids, refreshtokenids and gmail address for users">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="user's id"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="User's id"/>
         <FIELD NAME="refreshtokenid" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Refresh token aqcuired from Google offline ap"/>
         <FIELD NAME="gmail" TYPE="char" LENGTH="60" NOTNULL="false" DEFAULT="null" SEQUENCE="false"/>
       </FIELDS>
@@ -16,6 +16,19 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="useridindex" UNIQUE="true" FIELDS="userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="google_files_reference" COMMENT="Store course module ids and corresponding reference ids">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Course module id"/>
+        <FIELD NAME="reference" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="File reference"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="cmidindex" UNIQUE="true" FIELDS="cmid"/>
       </INDEXES>
     </TABLE>
   </TABLES>
