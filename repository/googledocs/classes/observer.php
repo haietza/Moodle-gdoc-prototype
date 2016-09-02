@@ -38,6 +38,7 @@ class repository_googledocs_observer {
      * Sync google resource permissions based on various events.
      *
      * @param \core\event\* $event The event fired.
+     * @return true
      */
     public static function manage_resources($event) {
         global $DB;
@@ -291,7 +292,12 @@ class repository_googledocs_observer {
         return true;
     }
 
-    // Get section number for course module.
+    /**
+     * Get the section number for a course module.
+     *
+     * @param course module id $cmid
+     * @return section number
+     */
     private static function get_cm_sectionnum($cmid) {
         global $DB;
         $sql = "SELECT cs.section
@@ -303,7 +309,12 @@ class repository_googledocs_observer {
         return $section->section;
     }
 
-    // Get course module records for section.
+    /**
+     * Get course module records for specified section.
+     *
+     * @param section number $sectionnumber
+     * @return array of course module records
+     */
     private static function get_section_course_modules($sectionnumber) {
         global $DB;
         $sql = "SELECT cm.id as cmid, cm.visible as cmvisible, cs.id as csid, cs.visible as csvisible
@@ -315,8 +326,14 @@ class repository_googledocs_observer {
         return $cms;
     }
 
-    // Add permission for specified user for specified module.
-    // Assumes all visibility and availability checks have been done before calling.
+    /**
+     * Insert permission for specified user for specified module.
+     * Assumes all visibility and availability checks have been done before calling.
+     *
+     * @param course module id $cmid
+     * @param user id $userid
+     * @param repo $repo
+     */
     private static function insert_cm_permission($cmid, $userid, $repo) {
         global $DB;
         $email = self::get_google_authenticated_users_email($userid);
@@ -341,7 +358,13 @@ class repository_googledocs_observer {
         }
     }
 
-    // Remove permission for specified user for specified module.
+    /**
+     * Delete permission for specified user for specified module.
+     *
+     * @param course module id $cmid
+     * @param user id $userid
+     * @param repo $repo
+     */
     private static function remove_cm_permission($cmid, $userid, $repo) {
         global $DB;
         $email = self::get_google_authenticated_users_email($userid);
@@ -357,7 +380,12 @@ class repository_googledocs_observer {
         }
     }
 
-    // Get fileid for course module.
+    /**
+     * Get the fileid for specified course module.
+     *
+     * @param course module id $cmid
+     * @return mixed fileid if files_reference record exists, false if not
+     */
     private static function get_resource($cmid) {
         global $DB;
         $googledocsrepo = $DB->get_record('repository', array ('type' => 'googledocs'), 'id');
@@ -389,7 +417,12 @@ class repository_googledocs_observer {
         }
     }
 
-    // Get gmail address for user.
+    /**
+     * Get the gmail address for a specified user.
+     *
+     * @param user id $userid
+     * @return mixed gmail address if record exists, false if not
+     */
     private static function get_google_authenticated_users_email($userid) {
         global $DB;
         $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid' => $userid), 'gmail');
@@ -400,7 +433,12 @@ class repository_googledocs_observer {
         }
     }
 
-    // Get Google authenticated userids for course.
+    /**
+     * Get userids for users in specified course.
+     *
+     * @param courseid $courseid
+     * @return array of userids
+     */
     private static function get_google_authenticated_userids($courseid) {
         global $DB;
         $sql = "SELECT DISTINCT grt.userid
@@ -420,7 +458,11 @@ class repository_googledocs_observer {
         return $usersarray;
     }
 
-    // Get Google Drive repo id.
+    /**
+     * Get Google Drive repo id.
+     *
+     * @return repository_googledocs
+     */
     private static function get_google_docs_repo() {
         global $DB;
         $googledocsrepo = $DB->get_record('repository', array ('type' => 'googledocs'), 'id');
