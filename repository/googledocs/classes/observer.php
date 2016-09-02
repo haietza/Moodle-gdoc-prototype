@@ -288,6 +288,166 @@ class repository_googledocs_observer {
                     }
                 }
                 break;
+            case '\core\event\user_enrolment_created':
+                $courseid = $event->courseid;
+                $userid = $event->relateduserid;
+                $coursecontext = context_course::instance($courseid);
+                $coursemodinfo = get_fast_modinfo($courseid, -1);
+                $coursemods = $coursemodinfo->get_cms();
+                $cms = array();
+                $cmids = array();
+                foreach ($coursemods as $cm) {
+                    if ($cm->modname == 'resource') {
+                        $cmids[] = $cm->id;
+                        $cms[] = $cm;
+                    }
+                }
+                if ($course->visible == 1) {
+                    foreach ($cms as $cm) {
+                        $cmid = $cm->id;
+                        if ($cm->visible == 1) {
+                            rebuild_course_cache($courseid, true);
+                            $modinfo = get_fast_modinfo($courseid, $userid);
+                            $cminfo = $modinfo->get_cm($cmid);
+                            $sectionnumber = self::get_cm_sectionnum($cmid);
+                            $secinfo = $modinfo->get_section_info($sectionnumber);
+                            if ($cminfo->uservisible
+                                && $secinfo->available
+                                && is_enrolled($coursecontext, $userid, '', true)) {
+                                    self::insert_cm_permission($cmid, $userid, $repo);
+                                } else {
+                                    self::remove_cm_permission($cmid, $userid, $repo);
+                                }
+                        } else {
+                            self::remove_cm_permission($cmid, $userid, $repo);
+                        }
+                    }
+                } else {
+                    foreach ($cmids as $cmid) {
+                        self::remove_cm_permission($cmid, $userid, $repo);
+                    }
+                }
+                break;
+            /**
+            case '\core\event\role_assigned':
+                $userid = $event->relateduserid;
+                $contextlevel = $event->contextlevel;
+                switch ($contextlevel) {
+                    case 10:
+                        $systemcontext = context_system::instance();
+                        if (has_capability('mod/resource:addinstance', $systemcontext, $userid)) {
+                            $categories = $DB->get_records('course_categories', array(), 'id', 'id');
+                            foreach ($categories as $category) {
+                                $categoryid = $category->id;
+                                $courses = $DB->get_records('course', array('category' => $categoryid), 'id', 'id');
+                                foreach ($courses as $course) {
+                                    $courseid = $course->id;
+                                    $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                                    foreach ($cms as $cm) {
+                                        $cmid = $cm->id;
+                                        self::insert_cm_permission($cmid, $userid, $repo, 'writer');
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case 40:
+                        $categoryid = $event->contextinstanceid;
+                        $categorycontext = context_coursecat::instance($categoryid);
+                        if (has_capability('mod/resource:addinstance', $categorycontext, $userid)) {
+                            $courses = $DB->get_records('course', array('category' => $categoryid), 'id', 'id');
+                            foreach ($courses as $course) {
+                                $courseid = $course->id;
+                                $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                                foreach ($cms as $cm) {
+                                    $cmid = $cm->id;
+                                    self::insert_cm_permission($cmid, $userid, $repo, 'writer');
+                                }
+                            }
+                        }
+                        break;
+                    case 50:
+                        $courseid = $event->courseid;
+                        $coursecontext = context_course::instance($courseid);
+                        if (has_capability('mod/resource:addinstance', $coursecontext, $userid)) {
+                            $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                            foreach ($cms as $cm) {
+                                $cmid = $cm->id;
+                                self::insert_cm_permission($cmid, $userid, $repo, 'writer');
+                            }
+            
+                        }
+                        break;
+                    case 70:
+                        $cmid = $event->contextinstanceid;
+                        $contextmodule = context_module::instance($cmid);
+                        if (has_capability('mod/resource:addinstance', $contextmodule, $userid)) {
+                            self::insert_cm_permission($cmid, $userid, $repo, 'writer');
+                        }
+                        break;
+                }
+                break;
+            case '\core\event\role_unassigned':
+                $userid = $event->relateduserid;
+                $contextlevel = $event->contextlevel;
+                switch ($contextlevel) {
+                    case 10:
+                        $systemcontext = context_system::instance();
+                        if (!has_capability('mod/resource:addinstance', $systemcontext, $userid)) {
+                            $categories = $DB->get_records('course_categories', array(), 'id', 'id');
+                            foreach ($categories as $category) {
+                                $categoryid = $category->id;
+                                $courses = $DB->get_records('course', array('category' => $categoryid), 'id', 'id');
+                                foreach ($courses as $course) {
+                                    $courseid = $course->id;
+                                    $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                                    foreach ($cms as $cm) {
+                                        $cmid = $cm->id;
+                                        self::remove_cm_permission($cmid, $userid, $repo, 'writer');
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case 40:
+                        $categoryid = $event->contextinstanceid;
+                        $categorycontext = context_coursecat::instance($categoryid);
+                        if (!has_capability('mod/resource:addinstance', $categorycontext, $userid)) {
+                            $courses = $DB->get_records('course', array('category' => $categoryid, 'visible' => 1));
+                            foreach ($courses as $course) {
+                                $courseid = $course->id;
+                                $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                                foreach ($cms as $cm) {
+                                    $cmid = $cm->id;
+                                    self::remove_cm_permission($cmid, $userid, $repo, 'writer');
+                                }
+                            }
+                        }
+                        break;
+                    case 50:
+                        $courseid = $event->courseid;
+                        $coursecontext = context_course::instance($courseid);
+                        if (has_capability('mod/resource:addinstance', $coursecontext, $userid)) {
+                            $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                            foreach ($cms as $cm) {
+                                $cmid = $cm->id;
+                                self::remove_cm_permission($cmid, $userid, $repo, 'writer');
+                            }
+            
+                        }
+                        break;
+                    case 70:
+                        $cmid = $event->contextinstanceid;
+                        $contextmodule = context_module::instance($cmid);
+                        if (has_capability('mod/resource:addinstance', $contextmodule, $userid)) {
+                            self::remove_cm_permission($cmid, $userid, $repo, 'writer');
+                        }
+                        break;
+                }
+                break;
+            case '\core\event\role_capabilities_updated':
+                break;
+                */
         }
         return true;
     }
