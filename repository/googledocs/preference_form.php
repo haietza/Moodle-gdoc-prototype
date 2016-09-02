@@ -34,7 +34,8 @@ require_once($CFG->dirroot . '/repository/googledocs/lib.php');
  */
 define('GOOGLE_DRIVE_URL', 'https://drive.google.com');
 
-/** * Form to edit repository google docs initial details.
+/**
+ *  Form to edit repository google docs initial details.
  *
  */
 class edit_repository_googledocs_form extends moodleform {
@@ -71,15 +72,15 @@ class edit_repository_googledocs_form extends moodleform {
     }
 
     /**
-     * returns google redirect url(which can be either 
+     * Returns google redirect url(which can be either
      * a login to google url or a revoke token url) and
      * a login status
      */
     private function get_redirect_url_and_connection_status() {
         global $DB, $USER;
 
-        $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'));
-        $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid'=>$USER->id));
+        $googledocsrepo = $DB->get_record('repository', array ('type' => 'googledocs'));
+        $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid' => $USER->id));
         $repooptions = array(
             'ajax' => false,
             'mimetypes' => array('.mp3')

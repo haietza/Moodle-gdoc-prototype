@@ -62,7 +62,7 @@ class repository_googledocs extends repository {
      */
     const CALLBACKURL = '/admin/oauth2callback.php';
 
-    private static $GOOGLE_LIVE_DOCS_TYPES = array('document', 'presentation', 'spreadsheet');
+    private static $googlelivedocstypes = array('document', 'presentation', 'spreadsheet');
     /**
      * Constructor.
      *
@@ -137,12 +137,12 @@ class repository_googledocs extends repository {
      */
     public function check_login() {
         global $USER, $DB;
-        $googlerefreshtokens = $DB->get_record('google_refreshtokens', array ('userid'=>$USER->id));
-        
+        $googlerefreshtokens = $DB->get_record('google_refreshtokens', array ('userid' => $USER->id));
+
         if ($googlerefreshtokens && !is_null($googlerefreshtokens->refreshtokenid)) {
             try {
                 $this->client->refreshToken($googlerefreshtokens->refreshtokenid);
-            } catch(Exception $e) {
+            } catch (Exception $e) {
                 $this->revoke_token();
             }
             $token = $this->client->getAccessToken();
@@ -164,7 +164,8 @@ class repository_googledocs extends repository {
         $url->param('revoke', 'yes');
         $url->param('reloadparentpage', true);
         $url->param('sesskey', sesskey());
-        return '<a target="_blank" href="'.$url->out(false).'">'.get_string('revokeyourgoogleaccount', 'repository_googledocs').'</a>';
+        return '<a target="_blank" href="'.$url->out(false).'">'.
+            get_string('revokeyourgoogleaccount', 'repository_googledocs').'</a>';
     }
 
     /**
@@ -182,7 +183,8 @@ class repository_googledocs extends repository {
 
         $url = new moodle_url($this->client->createAuthUrl());
         $url->param('state', $returnurl->out_as_local_url(false));
-        return '<a target="_blank" href="'.$url->out(false).'">'.get_string('connectyourgoogleaccount', 'repository_googledocs').'</a>';
+        return '<a target="_blank" href="'.$url->out(false).'">'.
+            get_string('connectyourgoogleaccount', 'repository_googledocs').'</a>';
     }
 
     /**
@@ -209,11 +211,11 @@ class repository_googledocs extends repository {
     }
 
     /**
-    * Build the breadcrumb from a path.
-    *
-    * @param string $path to create a breadcrumb from.
-    * @return array containing name and path of each crumb.
-    */
+     * Build the breadcrumb from a path.
+     *
+     * @param string $path to create a breadcrumb from.
+     * @return array containing name and path of each crumb.
+     */
     protected function build_breadcrumb($path) {
         $bread = explode('/', $path);
         $crumbtrail = '';
@@ -231,15 +233,15 @@ class repository_googledocs extends repository {
     }
 
     /**
-    * Generates a safe path to a node.
-    *
-    * Typically, a node will be id|Name of the node.
-    *
-    * @param string $id of the node.
-    * @param string $name of the node, will be URL encoded.
-    * @param string $root to append the node on, must be a result of this function.
-    * @return string path to the node.
-    */
+     * Generates a safe path to a node.
+     *
+     * Typically, a node will be id|Name of the node.
+     *
+     * @param string $id of the node.
+     * @param string $name of the node, will be URL encoded.
+     * @param string $root to append the node on, must be a result of this function.
+     * @return string path to the node.
+     */
     protected function build_node_path($id, $name = '', $root = '') {
         $path = $id;
         if (!empty($name)) {
@@ -252,12 +254,12 @@ class repository_googledocs extends repository {
     }
 
     /**
-    * Returns information about a node in a path.
-    *
-    * @see self::build_node_path()
-    * @param string $node to extrat information from.
-    * @return array about the node.
-    */
+     * Returns information about a node in a path.
+     *
+     * @see self::build_node_path()
+     * @param string $node to extrat information from.
+     * @return array about the node.
+     */
     protected function explode_node_path($node) {
         if (strpos($node, '|') !== false) {
             list($id, $name) = explode('|', $node, 2);
@@ -274,7 +276,6 @@ class repository_googledocs extends repository {
             'name' => $name
         );
     }
-
 
     /**
      * List the files and folders.
@@ -315,16 +316,16 @@ class repository_googledocs extends repository {
     /**
      * Search throughout the Google Drive.
      *
-     * @param string $search_text text to search for.
+     * @param string $searchtext text to search for.
      * @param int $page search page.
      * @return array of results.
      */
-    public function search($search_text, $page = 0) {
+    public function search($searchtext, $page = 0) {
         $path = $this->build_node_path('root', get_string('pluginname', 'repository_googledocs'));
-        $path = $this->build_node_path('search', $search_text, $path);
+        $path = $this->build_node_path('search', $searchtext, $path);
 
         // Query the Drive.
-        $q = "fullText contains '" . str_replace("'", "\'", $search_text) . "'";
+        $q = "fullText contains '" . str_replace("'", "\'", $searchtext) . "'";
         $q .= ' AND trashed = false';
         $results = $this->query($q, $path);
 
@@ -393,26 +394,26 @@ class repository_googledocs extends repository {
                     // This should be improved by allowing the user to select the type of export they'd like.
                     $type = str_replace('application/vnd.google-apps.', '', $item['mimeType']);
                     $title = '';
-                    $exportType = '';
+                    $exporttype = '';
                     switch ($type){
                         case 'document':
                             $title = $item['title'] . '.rtf';
-                            $exportType = 'application/rtf';
+                            $exporttype = 'application/rtf';
                             break;
                         case 'presentation':
                             $title = $item['title'] . '.pptx';
-                            $exportType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                            $exporttype = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
                             break;
                         case 'spreadsheet':
                             $title = $item['title'] . '.csv';
-                            $exportType = 'text/csv';
+                            $exporttype = 'text/csv';
                             break;
                     }
                     // Skips invalid/unknown types.
-                    if (empty($title) || !isset($item['exportLinks'][$exportType])) {
+                    if (empty($title) || !isset($item['exportLinks'][$exporttype])) {
                         continue;
                     }
-                    $source = $item['exportLinks'][$exportType];
+                    $source = $item['exportLinks'][$exporttype];
                 }
                 // Adds the file to the file list. Using the itemId along with the title as key
                 // of the array because Google Drive allows files with identical names.
@@ -464,7 +465,7 @@ class repository_googledocs extends repository {
      */
     public function get_file($source, $filename = '') {
         global $USER, $CFG;
-        $url = $this->get_doc_url_by_doc_id($source, $downloadUrl = true);
+        $url = $this->get_doc_url_by_doc_id($source, $downloadurl = true);
         $auth = $this->client->getAuth();
         $request = $auth->authenticatedRequest(new Google_Http_Request($url));
         if ($request->getResponseHttpCode() == 200) {
@@ -487,8 +488,8 @@ class repository_googledocs extends repository {
      * @param string $ref of the file.
      * @return string document url.
      */
-    public function get_link($ref){
-       return $this->service->files->get($ref)->alternateLink;
+    public function get_link($ref) {
+        return $this->service->files->get($ref)->alternateLink;
     }
 
     /**
@@ -526,14 +527,14 @@ class repository_googledocs extends repository {
         $token = json_decode($this->get_access_token());
         header('Authorization: Bearer ' . $token->access_token);
         if ($forcedownload) {
-            $downloadUrl = true;
-            $url = $this->get_doc_url_by_doc_id($id, $downloadUrl);
+            $downloadurl = true;
+            $url = $this->get_doc_url_by_doc_id($id, $downloadurl);
             header('Location: ' . $url);
             die;
         } else {
             $file = $this->service->files->get($id);
             $type = str_replace('application/vnd.google-apps.', '', $file['mimeType']);
-            if (in_array($type, self::$GOOGLE_LIVE_DOCS_TYPES)) {
+            if (in_array($type, self::$googlelivedocstypes)) {
                 redirect($file->alternateLink);
             } else {
                 header("Location: " . $file->downloadUrl . '&access_token='. $token->access_token);
@@ -542,10 +543,10 @@ class repository_googledocs extends repository {
         }
     }
 
-    private function get_doc_url_by_doc_id($id, $download_url=false) {
+    private function get_doc_url_by_doc_id($id, $downloadurl=false) {
         $file = $this->service->files->get($id);
         if (isset($file['fileExtension'])) {
-            if ($download_url) {
+            if ($downloadurl) {
                 $token = json_decode($this->get_access_token());
                 return $file['downloadUrl']. '&access_token='. $token->access_token;
             } else {
@@ -555,23 +556,23 @@ class repository_googledocs extends repository {
             // The file is probably a Google Doc file, we get the corresponding export link.
             // This should be improved by allowing the user to select the type of export they'd like.
             $type = str_replace('application/vnd.google-apps.', '', $file['mimeType']);
-            $exportType = '';
+            $exporttype = '';
             switch ($type){
                 case 'document':
-                    $exportType = 'application/rtf';
+                    $exporttype = 'application/rtf';
                     break;
                 case 'presentation':
-                    $exportType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                    $exporttype = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
                     break;
                 case 'spreadsheet':
-                    $exportType = 'text/csv';
+                    $exporttype = 'text/csv';
                     break;
             }
             // Skips invalid/unknown types.
-            if (!isset($file['exportLinks'][$exportType])) {
+            if (!isset($file['exportLinks'][$exporttype])) {
                 throw new repository_exception('repositoryerror', 'repository', '', 'Uknown file type');
             }
-            return $file['exportLinks'][$exportType];
+            return $file['exportLinks'][$exporttype];
         }
     }
     /**
@@ -636,16 +637,12 @@ class repository_googledocs extends repository {
      */
     private function delete_refresh_token() {
         global $DB, $USER;
-        $DB->delete_records('google_refreshtokens', array ('userid'=>$USER->id));
-        
+        $DB->delete_records('google_refreshtokens', array ('userid' => $USER->id));
+
         // Trigger event.
         \core\event\user_updated::create_from_userid($USER->id)->trigger();
     }
-    
-    //public function get_name() {
-    //    get_string('pluginname', 'repository_googledocs');
-    //}
-    
+
     /**
      * Saves the refresh token to database.
      *
@@ -657,11 +654,11 @@ class repository_googledocs extends repository {
         $newdata->refreshtokenid = $this->client->getRefreshToken();
         $newdata->gmail = $this->get_user_info()->email;
 
-        if(!is_null($newdata->refreshtokenid) && !is_null($newdata->gmail)) {
-            $rectoken = $DB->get_record('google_refreshtokens', array ('userid'=>$USER->id));
+        if (!is_null($newdata->refreshtokenid) && !is_null($newdata->gmail)) {
+            $rectoken = $DB->get_record('google_refreshtokens', array ('userid' => $USER->id));
             if ($rectoken) {
                 $newdata->id = $rectoken->id;
-                if($newdata->gmail === $rectoken->gmail){
+                if ($newdata->gmail === $rectoken->gmail) {
                     unset($newdata->gmail);
                 }
                 $DB->update_record('google_refreshtokens', $newdata);
@@ -671,172 +668,181 @@ class repository_googledocs extends repository {
                 $DB->insert_record('google_refreshtokens', $newdata);
             }
         }
-        
+
         // Trigger event.
         \core\event\user_updated::create_from_userid($USER->id)->trigger();
     }
 
     /**
-    * Retrieve a list of permissions.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to retrieve permissions for.
-    * @return Array List of permissions.
-    */
-   function retrieve_file_permissions($fileId) {
-     try {
-       $permissions = $this->service->permissions->listPermissions($fileId);
-       return $permissions->getItems();
-     } catch (Exception $e) {
-         //print("Can't access the file and so it's permissions.<br/>");
-        print "An error occurred: " . $e->getMessage();
-        print "<br/>";
-     }
-     return NULL;
-   }
+     * Retrieve a list of permissions.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to retrieve permissions for.
+     * @return Array List of permissions.
+     */
+    public function retrieve_file_permissions($fileid) {
+        try {
+            $permissions = $this->service->permissions->listPermissions($fileid);
+            return $permissions->getItems();
+        } catch (Exception $e) {
+            // print("Can't access the file and so it's permissions.<br/>");
+            print "An error occurred: " . $e->getMessage();
+            print "<br/>";
+        }
+        return null;
+    }
 
     /**
-    * Print the Permission ID for an email address.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $email Email address to retrieve ID for.
-    */
-   function print_permission_id_for_email($gmail) {
-     try {
-       $permissionId = $this->service->permissions->getIdForEmail($gmail);
-       return $permissionId->getId();
-     } catch (Exception $e) {
-       print "An error occurred: " . $e->getMessage();
-     }
-   }
+     * Print the Permission ID for an email address.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $email Email address to retrieve ID for.
+     */
+    public function print_permission_id_for_email($gmail) {
+        try {
+            $permissionid = $this->service->permissions->getIdForEmail($gmail);
+            return $permissionid->getId();
+        } catch (Exception $e) {
+            print "An error occurred: " . $e->getMessage();
+        }
+    }
 
-   /**
-    * Print information about the specified permission.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to print permission for.
-    * @param String $permissionId ID of the permission to print.
-    */
-   public function print_user_permission($fileId, $permissionId) {
-     try {
-       $permission = $this->service->permissions->get($fileId, $permissionId);
-       print "Name: " . $permission->getName();
-       print "<br/>";
-       print "Role: " . $permission->getRole();
-       print "<br/>";
-       print "permission: " . $permissionId;
-       print "<br/>";
-       $additionalRoles = $permission->getAdditionalRoles();
-       if(!empty($additionalRoles)) {
-         foreach($additionalRoles as $additionalRole) {
-           print "Additional role: " . $additionalRole;
-         }
-       }
-     } catch (Exception $e) {
-         print"User is not permitted to access the resource.<br/>";
-        //print "An error occurred: " . $e->getMessage();
-     }
-   }
+    /**
+     * Print information about the specified permission.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to print permission for.
+     * @param String $permissionid ID of the permission to print.
+     */
+    public function print_user_permission($fileid, $permissionid) {
+        try {
+            $permission = $this->service->permissions->get($fileid, $permissionid);
+            print "Name: " . $permission->getName();
+            print "<br/>";
+            print "Role: " . $permission->getRole();
+            print "<br/>";
+            print "permission: " . $permissionid;
+            print "<br/>";
+            $additionalroles = $permission->getAdditionalRoles();
+            if (!empty($additionalroles)) {
+                foreach ($additionalroles as $additionalrole) {
+                    print "Additional role: " . $additionalrole;
+                }
+            }
+        } catch (Exception $e) {
+            print"User is not permitted to access the resource.<br/>";
+            // print "An error occurred: " . $e->getMessage();
+        }
+    }
 
-   /**
-    * Insert a new permission.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to insert permission for.
-    * @param String $value User or group e-mail address, domain name or NULL for
-                          "default" type.
-    * @param String $type The value "user", "group", "domain" or "default".
-    * @param String $role The value "owner", "writer" or "reader".
-    * @return Google_Servie_Drive_Permission The inserted permission. NULL is
-    *     returned if an API error occurred.
-    */
-   function insert_permission($fileId, $value, $type, $role) {
-     $name = explode('@', $value);
-     $gmail = $value;
-     $newPermission = new Google_Service_Drive_Permission();
-     $newPermission->setValue($value);
-     $newPermission->setType($type);
-     $newPermission->setRole($role);
-     $newPermission->setEmailAddress($gmail);
-     $newPermission->setDomain($name[1]);
-     $newPermission->setName($name[0]);
-     $optParams = array(
-         'sendNotificationEmails' => false
-     );
-     try {
-       return $this->service->permissions->insert($fileId, $newPermission, $optParams);
-     } catch (Exception $e) {
-       //print("Insert permission failed. Please retry with approriate permission role.");
-       print "An error occurred: " . $e->getMessage();
-     }
-     return NULL;
-   }
+    public function get_user_role($fileid, $permissionid) {
+        try {
+            $permission = $this->service->permissions->get($fileid, $permissionid);
+        } catch (Exception $e) {
+            print "An error occurred: " . $e->getMessage();
+        }
+        return $permission->getRole();
+    }
 
-   /**
-    * Remove a permission.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to remove the permission for.
-    * @param String $permissionId ID of the permission to remove.
-    */
-   function remove_permission($fileId, $permissionId) {
-     try {
-         $permission = $this->service->permissions->get($fileId, $permissionId);
-         $role = $permission->getRole();
-         if ($role != 'owner') {
-             $this->service->permissions->delete($fileId, $permissionId);
-             print("Succefully deleted the specified permission");
-         }
-     } catch (Exception $e) {
-       debugging("Delete failed...");
-       print "<br/> An error occurred: " . $e->getMessage() . "<br/>";
-     }
-   }
+    /**
+     * Insert a new permission.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to insert permission for.
+     * @param String $value User or group e-mail address, domain name or NULL for
+              "default" type.
+     * @param String $type The value "user", "group", "domain" or "default".
+     * @param String $role The value "owner", "writer" or "reader".
+     * @return Google_Servie_Drive_Permission The inserted permission. NULL is
+     *     returned if an API error occurred.
+     */
+    public function insert_permission($fileid, $value, $type, $role) {
+        $name = explode('@', $value);
+        $gmail = $value;
+        $newpermission = new Google_Service_Drive_Permission();
+        $newpermission->setValue($value);
+        $newpermission->setType($type);
+        $newpermission->setRole($role);
+        $newpermission->setEmailAddress($gmail);
+        $newpermission->setDomain($name[1]);
+        $newpermission->setName($name[0]);
+        $optparams = array(
+            'sendNotificationEmails' => false
+        );
+        try {
+            return $this->service->permissions->insert($fileid, $newpermission, $optparams);
+        } catch (Exception $e) {
+            // print("Insert permission failed. Please retry with approriate permission role.");
+            print "An error occurred: " . $e->getMessage();
+        }
+        return null;
+    }
 
-   /**
-    * Update a permission's role.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to update permission for.
-    * @param String $permissionId ID of the permission to update.
-    * @param String $newRole The value "owner", "writer" or "reader".
-    * @return Google_Servie_Drive_Permission The updated permission. NULL is
-    *     returned if an API error occurred.
-    */
-   function update_permission($fileId, $permissionId, $newRole) {
-     try {
-       // First retrieve the permission from the API.
-       $permission = $this->service->permissions->get($fileId, $permissionId);
-       $value = $permission->getValue();
-       $type = $permission->getType();
-       $this->remove_permission($fileId, $permissionId);
-       return $this->insert_permission($fileid, $value, $type, $newRole);
-     } catch (Exception $e) {
-       print "An error occurred: " . $e->getMessage();
-     }
-     return NULL;
-   }
+    /**
+     * Remove a permission.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to remove the permission for.
+     * @param String $permissionid ID of the permission to remove.
+     */
+    public function remove_permission($fileid, $permissionid) {
+        try {
+            $permission = $this->service->permissions->get($fileid, $permissionid);
+            $role = $permission->getRole();
+            if ($role != 'owner') {
+                $this->service->permissions->delete($fileid, $permissionid);
+                print("Succefully deleted the specified permission");
+            }
+        } catch (Exception $e) {
+            debugging("Delete failed...");
+            print "<br/> An error occurred: " . $e->getMessage() . "<br/>";
+        }
+    }
 
-   /**
-    * Patch a permission's role.
-    *
-    * @param Google_Service_Drive $service Drive API service instance.
-    * @param String $fileId ID of the file to update permission for.
-    * @param String $permissionId ID of the permission to patch.
-    * @param String $newRole The value "owner", "writer" or "reader".
-    * @return Google_Servie_Drive_Permission The patched permission. NULL is
-    *     returned if an API error occurred.
-    */
-   function patch_permission($fileId, $permissionId, $newRole) {
-     $patchedPermission = new Google_Service_Drive_Permission();
-     $patchedPermission->setRole($newRole);
-     try {
-       return $this->service->permissions->patch($fileId, $permissionId, $patchedPermission);
-     } catch (Exception $e) {
-       print "An error occurred: " . $e->getMessage();
-     }
-     return NULL;
-   }
+    /**
+     * Update a permission's role.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to update permission for.
+     * @param String $permissionid ID of the permission to update.
+     * @param String $newrole The value "owner", "writer" or "reader".
+     * @return Google_Servie_Drive_Permission The updated permission. NULL is
+     *         returned if an API error occurred.
+     */
+    public function update_permission($fileid, $permissionid, $newrole) {
+        try {
+            // First retrieve the permission from the API.
+            $permission = $this->service->permissions->get($fileid, $permissionid);
+            $value = $permission->getValue();
+            $type = $permission->getType();
+            $this->remove_permission($fileid, $permissionid);
+            return $this->insert_permission($fileid, $value, $type, $newrole);
+        } catch (Exception $e) {
+            print "An error occurred: " . $e->getMessage();
+        }
+        return null;
+    }
+
+    /**
+     * Patch a permission's role.
+     *
+     * @param Google_Service_Drive $service Drive API service instance.
+     * @param String $fileid ID of the file to update permission for.
+     * @param String $permissionid ID of the permission to patch.
+     * @param String $newrole The value "owner", "writer" or "reader".
+     * @return Google_Servie_Drive_Permission The patched permission. NULL is
+     *         returned if an API error occurred.
+     */
+    public function patch_permission($fileid, $permissionid, $newrole) {
+        $patchedpermission = new Google_Service_Drive_Permission();
+        $patchedpermission->setRole($newrole);
+        try {
+            return $this->service->permissions->patch($fileid, $permissionid, $patchedpermission);
+        } catch (Exception $e) {
+            print "An error occurred: " . $e->getMessage();
+        }
+        return null;
+    }
 }
 
 /**

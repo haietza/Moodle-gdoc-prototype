@@ -34,7 +34,6 @@ require_once($CFG->dirroot . '/repository/googledocs/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class repository_googledocs_observer {
-    
     /**
      * Sync google resource permissions based on various events.
      *
@@ -43,13 +42,13 @@ class repository_googledocs_observer {
     public static function manage_resources($event) {
         global $DB;
         $repo = self::get_google_docs_repo();
-        
         switch($event->eventname) {
             case '\core\event\course_category_updated':
                 $categoryid = $event->objectid;
-                $courses = self::get_courses($categoryid);
+                $courses = $DB->get_records('course', array('category' => $categoryid), 'id', 'id, visible');
                 foreach ($courses as $course) {
                     $courseid = $course->id;
+                    $coursecontext = context_course::instance($courseid);
                     $userids = self::get_google_authenticated_userids($courseid);
                     $coursemodinfo = get_fast_modinfo($courseid, -1);
                     $coursemods = $coursemodinfo->get_cms();
@@ -71,22 +70,21 @@ class repository_googledocs_observer {
                                     $cminfo = $modinfo->get_cm($cmid);
                                     $sectionnumber = self::get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    if ($cminfo->uservisible && $secinfo->available) {
-                                        self::insert_cm_permission($cmid, $userid, $repo);
-                                    }
-                                    else {
+                                    if ($cminfo->uservisible
+                                        && $secinfo->available
+                                        && is_enrolled($coursecontext, $userid, '', true)) {
+                                            self::insert_cm_permission($cmid, $userid, $repo);
+                                    } else {
                                         self::remove_cm_permission($cmid, $userid, $repo);
                                     }
                                 }
-                            }
-                            else {
+                            } else {
                                 foreach ($userids as $userid) {
                                     self::remove_cm_permission($cmid, $userid, $repo);
                                 }
                             }
                         }
-                    }
-                    else {
+                    } else {
                         foreach ($cmids as $cmid) {
                             foreach ($userids as $userid) {
                                 self::remove_cm_permission($cmid, $userid, $repo);
@@ -97,7 +95,8 @@ class repository_googledocs_observer {
                 break;
             case '\core\event\course_updated':
                 $courseid = $event->courseid;
-                $course = $DB->get_record('course', array('id'=>$courseid), 'visible');
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
                 $userids = self::get_google_authenticated_userids($courseid);
                 $coursemodinfo = get_fast_modinfo($courseid, -1);
                 $cms = $coursemodinfo->get_cms();
@@ -115,22 +114,19 @@ class repository_googledocs_observer {
                                 $cminfo = $modinfo->get_cm($cmid);
                                 $sectionnumber = self::get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available) {
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
                                     self::insert_cm_permission($cmid, $userid, $repo);
-                                }
-                                else {
+                                } else {
                                     self::remove_cm_permission($cmid, $userid, $repo);
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             foreach ($userids as $userid) {
                                 self::remove_cm_permission($cmid, $userid, $repo);
                             }
                         }
-                    }   
-                }
-                else {
+                    }
+                } else {
                     foreach ($cmids as $cmid) {
                         foreach ($userids as $userid) {
                             self::remove_cm_permission($cmid, $userid, $repo);
@@ -138,11 +134,22 @@ class repository_googledocs_observer {
                     }
                 }
                 break;
+            case '\core\event\course_content_deleted':
+                $courseid = $event->courseid;
+                $userids = self::get_google_authenticated_userids($courseid);
+                $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                foreach ($cms as $cm) {
+                    foreach ($userids as $userid) {
+                        self::remove_cm_permission($cm->cmid, $userid, $repo);
+                    }
+                    $DB->delete_records('google_files_reference', array('cmid' => $cm->cmid));
+                }
+                break;
             case '\core\event\course_section_updated':
                 $courseid = $event->courseid;
-                $course = $DB->get_record('course', array('id'=>$courseid), 'visible');
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
                 $userids = self::get_google_authenticated_userids($courseid);
-                //$modinfo = get_fast_modinfo($courseid, -1);
                 $sectionnumber = $event->other['sectionnum'];
                 $cms = self::get_section_course_modules($sectionnumber);
                 if ($course->visible == 1) {
@@ -155,22 +162,19 @@ class repository_googledocs_observer {
                                 $cminfo = $modinfo->get_cm($cmid);
                                 $sectionnumber = self::get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available) {
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
                                     self::insert_cm_permission($cmid, $userid, $repo);
-                                }
-                                else {
+                                } else {
                                     self::remove_cm_permission($cmid, $userid, $repo);
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             foreach ($userids as $userid) {
                                 self::remove_cm_permission($cmid, $userid, $repo);
                             }
                         }
                     }
-                }
-                else {
+                } else {
                     foreach ($cms as $cm) {
                         $cmid = $cm->id;
                         foreach ($userids as $userid) {
@@ -180,13 +184,14 @@ class repository_googledocs_observer {
                 }
                 break;
             case '\core\event\course_module_created':
-                // Deal with file permissions
+                // Deal with file permissions.
                 $courseid = $event->courseid;
-                $course = $DB->get_record('course', array('id'=>$courseid), 'visible');
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
                 $userids = self::get_google_authenticated_userids($courseid);
                 $cmid = $event->contextinstanceid;
                 if ($course->visible == 1) {
-                    $cm = self::get_course_module($cmid);
+                    $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
                     if ($cm->visible == 1) {
                         rebuild_course_cache($courseid, true);
                         foreach ($userids as $userid) {
@@ -194,28 +199,26 @@ class repository_googledocs_observer {
                             $sectionnumber = self::get_cm_sectionnum($cmid);
                             $secinfo = $modinfo->get_section_info($sectionnumber);
                             $cminfo = $modinfo->get_cm($cmid);
-                            if ($cminfo->uservisible && $secinfo->available) {
+                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
                                 self::insert_cm_permission($cmid, $userid, $repo);
-                            }
-                            else {
+                            } else {
                                 self::remove_cm_permission($cmid, $userid, $repo);
                             }
                         }
-                    }
-                    else {
+                    } else {
                         foreach ($userids as $userid) {
                             self::remove_cm_permission($cmid, $userid, $repo);
                         }
                     }
-                }
-                else {
+                } else {
                     foreach ($userids as $userid) {
                         self::remove_cm_permission($cmid, $userid, $repo);
                     }
                 }
-                
-                // Store cmid and reference
+
+                // Store cmid and reference.
                 $newdata = new stdClass();
+                $newdata->courseid = $courseid;
                 $newdata->cmid = $cmid;
                 $newdata->reference = self::get_resource($cmid);
                 if ($newdata->reference) {
@@ -223,13 +226,14 @@ class repository_googledocs_observer {
                 }
                 break;
             case '\core\event\course_module_updated':
-                // Deal with file permissions
+                // Deal with file permissions.
                 $courseid = $event->courseid;
-                $course = $DB->get_record('course', array('id'=>$courseid), 'visible');
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
                 $userids = self::get_google_authenticated_userids($courseid);
                 $cmid = $event->contextinstanceid;
                 if ($course->visible == 1) {
-                    $cm = self::get_course_module($cmid);
+                    $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
                     if ($cm->visible == 1) {
                         rebuild_course_cache($courseid, true);
                         foreach ($userids as $userid) {
@@ -237,37 +241,30 @@ class repository_googledocs_observer {
                             $sectionnumber = self::get_cm_sectionnum($cmid);
                             $secinfo = $modinfo->get_section_info($sectionnumber);
                             $cminfo = $modinfo->get_cm($cmid);
-                            if ($cminfo->uservisible && $secinfo->available) {
+                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
                                 self::insert_cm_permission($cmid, $userid, $repo);
-                                $existing = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'id');
-                                if ($existing) {
-                                    self::remove_cm_permission($cmid, $userid, $repo);
-                                }
-                            }
-                            else {
+                            } else {
                                 self::remove_cm_permission($cmid, $userid, $repo);
                             }
                         }
-                    }
-                    else {
+                    } else {
                         foreach ($userids as $userid) {
                             self::remove_cm_permission($cmid, $userid, $repo);
                         }
                     }
-                }
-                else {
+                } else {
                     foreach ($userids as $userid) {
                         self::remove_cm_permission($cmid, $userid, $repo);
                     }
                 }
-                
-                // Update course module reference
+
+                // Update course module reference.
                 $newdata = new stdClass();
                 $newdata->cmid = $cmid;
                 $newdata->reference = self::get_resource($cmid);
-                
+
                 if (!is_null($newdata->cmid) && $newdata->reference) {
-                    $reference = $DB->get_record('google_files_reference', array ('cmid'=>$cmid), 'id, reference');
+                    $reference = $DB->get_record('google_files_reference', array ('cmid' => $cmid), 'id, reference');
                     if ($reference) {
                         $newdata->id = $reference->id;
                         if ($newdata->reference != $reference->reference) {
@@ -286,11 +283,6 @@ class repository_googledocs_observer {
                         foreach ($userids as $userid) {
                             self::remove_cm_permission($cmid, $userid, $repo);
                         }
-                    }
-                    
-                    // Delete course module reference
-                    $gcmid = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'id');
-                    if ($gcmid) {
                         $DB->delete_records('google_files_reference', array('cmid' => $cmid));
                     }
                 }
@@ -298,15 +290,8 @@ class repository_googledocs_observer {
         }
         return true;
     }
-    
-    // Get course records for category
-    private static function get_courses($categoryid) {
-        global $DB;
-        $courses = $DB->get_records('course', array('category' => $categoryid), 'id', 'id, visible');
-        return $courses;
-    }
-    
-    // Get section number for course module
+
+    // Get section number for course module.
     private static function get_cm_sectionnum($cmid) {
         global $DB;
         $sql = "SELECT cs.section
@@ -317,49 +302,51 @@ class repository_googledocs_observer {
         $section = $DB->get_record_sql($sql, array('cmid' => $cmid));
         return $section->section;
     }
-    
-    // Get course module record
-    private static function get_course_module($cmid) {
-        global $DB;
-        $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
-        return $cm;
-    }
-    
-    // Get course module records for section
+
+    // Get course module records for section.
     private static function get_section_course_modules($sectionnumber) {
         global $DB;
         $sql = "SELECT cm.id as cmid, cm.visible as cmvisible, cs.id as csid, cs.visible as csvisible
                 FROM {course_modules} cm
-                LEFT JOIN {course_sections} cs 
-                ON cm.section = cs.id 
+                LEFT JOIN {course_sections} cs
+                ON cm.section = cs.id
                 WHERE cs.section = :sectionnum;";
         $cms = $DB->get_records_sql($sql, array('sectionnum' => $sectionnumber));
         return $cms;
     }
-    
-    // Add permission for specified user for specified module
-    // Assumes all visibility and availability checks have been done before calling
+
+    // Add permission for specified user for specified module.
+    // Assumes all visibility and availability checks have been done before calling.
     private static function insert_cm_permission($cmid, $userid, $repo) {
+        global $DB;
         $email = self::get_google_authenticated_users_email($userid);
         $fileid = self::get_resource($cmid);
         if ($fileid) {
-            try {
-                $repo->insert_permission($fileid, $email,  'user', 'reader');
-            } catch (Exception $e) {
-                print "An error occurred: " . $e->getMessage();
+            $existing = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'reference');
+            if ($existing && ($existing->reference != $fileid)) {
+                try {
+                    $permissionid = $repo->print_permission_id_for_email($email);
+                    $repo->remove_permission($existing->reference, $permissionid);
+                    $repo->insert_permission($fileid, $email,  'user', 'reader');
+                } catch (Exception $e) {
+                    print "An error occurred: " . $e->getMessage();
+                }
+            } else {
+                try {
+                    $repo->insert_permission($fileid, $email,  'user', 'reader');
+                } catch (Exception $e) {
+                    print "An error occurred: " . $e->getMessage();
+                }
             }
         }
     }
-    
-    // Remove permission for specified user for specified module
+
+    // Remove permission for specified user for specified module.
     private static function remove_cm_permission($cmid, $userid, $repo) {
         global $DB;
         $email = self::get_google_authenticated_users_email($userid);
-        //$fileid = self::get_resource($cmid);
-        //if (!$fileid) {
-            $filerec = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'reference');
-            $fileid = $filerec->reference;
-        //}
+        $filerec = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'reference');
+        $fileid = $filerec->reference;
         if ($fileid) {
             try {
                 $permissionid = $repo->print_permission_id_for_email($email);
@@ -369,18 +356,18 @@ class repository_googledocs_observer {
             }
         }
     }
-    
-    // Get fileid for course module
+
+    // Get fileid for course module.
     private static function get_resource($cmid) {
         global $DB;
-        $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'), 'id');
+        $googledocsrepo = $DB->get_record('repository', array ('type' => 'googledocs'), 'id');
         $id = $googledocsrepo->id;
         if (empty($id)) {
             // We did not find any instance of googledocs.
             mtrace('Could not find any instance of the repository');
             return;
         }
-        
+
         $sql = "SELECT DISTINCT r.reference
                 FROM {files_reference} r
                 LEFT JOIN {files} f
@@ -393,28 +380,27 @@ class repository_googledocs_observer {
                 AND r.repositoryid = :repoid
                 AND f.referencefileid IS NOT NULL
                 AND not (f.component = :component and f.filearea = :filearea)";
-        $filerecord = $DB->get_record_sql($sql, array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
+        $filerecord = $DB->get_record_sql($sql,
+            array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
         if ($filerecord) {
             return $filerecord->reference;
-        }
-        else {
+        } else {
             return false;
         }
     }
-    
-    // Get gmail address for user
+
+    // Get gmail address for user.
     private static function get_google_authenticated_users_email($userid) {
         global $DB;
-        $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid'=> $userid), 'gmail');
+        $googlerefreshtoken = $DB->get_record('google_refreshtokens', array ('userid' => $userid), 'gmail');
         if ($googlerefreshtoken) {
             return $googlerefreshtoken->gmail;
-        }
-        else {
+        } else {
             return false;
         }
     }
-    
-    // Get Google authenticated userids for course
+
+    // Get Google authenticated userids for course.
     private static function get_google_authenticated_userids($courseid) {
         global $DB;
         $sql = "SELECT DISTINCT grt.userid
@@ -425,19 +411,19 @@ class repository_googledocs_observer {
                 ON eu1_ue.userid = eu1_u.id
                 JOIN {enrol} eu1_e
                 ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
-                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid ";
+                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid AND eu1_ue.status = 0";
         $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
         $usersarray = array();
-        foreach($users as $user) {
+        foreach ($users as $user) {
             $usersarray[] = $user->userid;
         }
         return $usersarray;
     }
-    
-    // Get Google Drive repo id
+
+    // Get Google Drive repo id.
     private static function get_google_docs_repo() {
         global $DB;
-        $googledocsrepo = $DB->get_record('repository', array ('type'=>'googledocs'), 'id');
+        $googledocsrepo = $DB->get_record('repository', array ('type' => 'googledocs'), 'id');
         return new repository_googledocs($googledocsrepo->id);
     }
 }
