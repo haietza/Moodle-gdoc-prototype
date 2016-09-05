@@ -288,42 +288,108 @@ class repository_googledocs_observer {
                     }
                 }
                 break;
-            case '\core\event\user_enrolment_created':
-                $courseid = $event->courseid;
-                $userid = $event->relateduserid;
-                $coursecontext = context_course::instance($courseid);
-                $coursemodinfo = get_fast_modinfo($courseid, -1);
-                $coursemods = $coursemodinfo->get_cms();
-                $cms = array();
-                $cmids = array();
-                foreach ($coursemods as $cm) {
-                    if ($cm->modname == 'resource') {
-                        $cmids[] = $cm->id;
-                        $cms[] = $cm;
-                    }
-                }
-                if ($course->visible == 1) {
-                    foreach ($cms as $cm) {
-                        $cmid = $cm->id;
-                        if ($cm->visible == 1) {
-                            rebuild_course_cache($courseid, true);
-                            $modinfo = get_fast_modinfo($courseid, $userid);
-                            $cminfo = $modinfo->get_cm($cmid);
-                            $sectionnumber = self::get_cm_sectionnum($cmid);
-                            $secinfo = $modinfo->get_section_info($sectionnumber);
-                            if ($cminfo->uservisible
-                                && $secinfo->available
-                                && is_enrolled($coursecontext, $userid, '', true)) {
-                                    self::insert_cm_permission($cmid, $userid, $repo);
+            case '\core\event\user_updated':
+                $userid = $event->objectid;
+                $email = self::get_google_authenticated_users_email($userid);
+                if ($email) {
+                    $usercourses = self::get_user_courseids($userid);
+                    foreach ($usercourses as $usercourse) {
+                        $courseid = $usercourse->courseid;
+                        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                        $coursecontext = context_course::instance($courseid);
+                        $coursemodinfo = get_fast_modinfo($courseid, -1);
+                        $coursemods = $coursemodinfo->get_cms();
+                        $cms = array();
+                        $cmids = array();
+                        foreach ($coursemods as $cm) {
+                            if ($cm->modname == 'resource') {
+                                $cmids[] = $cm->id;
+                                $cms[] = $cm;
+                            }
+                        }
+                        if ($course->visible == 1) {
+                            foreach ($cms as $cm) {
+                                $cmid = $cm->id;
+                                if ($cm->visible == 1) {
+                                    rebuild_course_cache($courseid, true);
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $sectionnumber = self::get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible
+                                        && $secinfo->available
+                                        && is_enrolled($coursecontext, $userid, '', true)) {
+                                            self::insert_cm_permission($cmid, $userid, $repo);
+                                        } else {
+                                            self::remove_cm_permission($cmid, $userid, $repo);
+                                        }
                                 } else {
                                     self::remove_cm_permission($cmid, $userid, $repo);
                                 }
+                            }
                         } else {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            foreach ($cmids as $cmid) {
+                                self::remove_cm_permission($cmid, $userid, $repo);
+                            }
                         }
                     }
                 } else {
-                    foreach ($cmids as $cmid) {
+                    // Remove permission for gmail account disconnected?
+                }
+                break;
+            case '\core\event\user_enrolment_created':
+            case '\core\event\user_enrolment_updated':
+                $courseid = $event->courseid;
+                $userid = $event->relateduserid;
+                $email = self::get_google_authenticated_users_email($userid);
+                if ($email) {
+                    $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                    $coursecontext = context_course::instance($courseid);
+                    $coursemodinfo = get_fast_modinfo($courseid, -1);
+                    $coursemods = $coursemodinfo->get_cms();
+                    $cms = array();
+                    $cmids = array();
+                    foreach ($coursemods as $cm) {
+                        if ($cm->modname == 'resource') {
+                            $cmids[] = $cm->id;
+                            $cms[] = $cm;
+                        }
+                    }
+                    if ($course->visible == 1) {
+                        foreach ($cms as $cm) {
+                            $cmid = $cm->id;
+                            if ($cm->visible == 1) {
+                                rebuild_course_cache($courseid, true);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = self::get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible
+                                    && $secinfo->available
+                                    && is_enrolled($coursecontext, $userid, '', true)) {
+                                        self::insert_cm_permission($cmid, $userid, $repo);
+                                    } else {
+                                        self::remove_cm_permission($cmid, $userid, $repo);
+                                    }
+                            } else {
+                                self::remove_cm_permission($cmid, $userid, $repo);
+                            }
+                        }
+                    } else {
+                        foreach ($cmids as $cmid) {
+                            self::remove_cm_permission($cmid, $userid, $repo);
+                        }
+                    }
+                }
+                break;
+            case '\core\event\user_enrolment_deleted':
+                $courseid = $event->courseid;
+                $userid = $event->relateduserid;
+                $email = self::get_google_authenticated_users_email($userid);
+                if ($email) {
+                    $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
+                    foreach ($cms as $cm) {
+                        $cmid = $cm->cmid;
                         self::remove_cm_permission($cmid, $userid, $repo);
                     }
                 }
@@ -616,6 +682,23 @@ class repository_googledocs_observer {
             $usersarray[] = $user->userid;
         }
         return $usersarray;
+    }
+    
+    /**
+     * Get course records for specified user
+     * 
+     * @param user id $userid
+     * @return course records
+     */
+    private static function get_user_courseids($userid) {
+        global $DB;
+        $sql = "SELECT e.courseid
+                FROM {enrol} e
+                LEFT JOIN {user_enrolments} ue
+                ON e.id = ue.enrolid 
+                WHERE ue.userid = :userid;";
+        $courses = $DB->get_recordset_sql($sql, array('userid' => $userid));
+        return $courses;
     }
 
     /**

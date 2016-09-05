@@ -73,5 +73,21 @@ $observers = array (
     array (
         'eventname'   => '\core\event\grouping_updated',
         'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_created',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_updated',
+        'callback'    => $callback
     )
 );
