@@ -75,7 +75,11 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\core\event\user_updated',
+        'eventname'   => '\repository_googledocs\event\google_refreshtokens_created',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\repository_googledocs\event\google_refreshtokens_deleted',
         'callback'    => $callback
     ),
     array (

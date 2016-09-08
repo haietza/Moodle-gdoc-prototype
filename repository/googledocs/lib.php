@@ -637,10 +637,11 @@ class repository_googledocs extends repository {
      */
     private function delete_refresh_token() {
         global $DB, $USER;
+        $grt = $DB->get_record('google_refreshtokens', array('userid' => $USER->id));
+        $event = \repository_googledocs\event\google_refreshtokens_deleted::create_from_userid($USER->id);
+        $event->add_record_snapshot('google_refreshtokens', $grt);
+        $event->trigger();
         $DB->delete_records('google_refreshtokens', array ('userid' => $USER->id));
-
-        // Trigger event.
-        \core\event\user_updated::create_from_userid($USER->id)->trigger();
     }
 
     /**
@@ -668,9 +669,9 @@ class repository_googledocs extends repository {
                 $DB->insert_record('google_refreshtokens', $newdata);
             }
         }
-
-        // Trigger event.
-        \core\event\user_updated::create_from_userid($USER->id)->trigger();
+        
+        $event = \repository_googledocs\event\google_refreshtokens_created::create_from_userid($USER->id);
+        $event->trigger();
     }
 
     /**
@@ -733,15 +734,6 @@ class repository_googledocs extends repository {
             print"User is not permitted to access the resource.<br/>";
             // print "An error occurred: " . $e->getMessage();
         }
-    }
-
-    public function get_user_role($fileid, $permissionid) {
-        try {
-            $permission = $this->service->permissions->get($fileid, $permissionid);
-        } catch (Exception $e) {
-            print "An error occurred: " . $e->getMessage();
-        }
-        return $permission->getRole();
     }
 
     /**

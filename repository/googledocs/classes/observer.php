@@ -67,6 +67,7 @@ class repository_googledocs_observer {
                             if ($cm->visible == 1) {
                                 rebuild_course_cache($courseid, true);
                                 foreach ($userids as $userid) {
+                                    $email = self::get_google_authenticated_users_email($userid);
                                     $modinfo = get_fast_modinfo($courseid, $userid);
                                     $cminfo = $modinfo->get_cm($cmid);
                                     $sectionnumber = self::get_cm_sectionnum($cmid);
@@ -74,21 +75,23 @@ class repository_googledocs_observer {
                                     if ($cminfo->uservisible
                                         && $secinfo->available
                                         && is_enrolled($coursecontext, $userid, '', true)) {
-                                            self::insert_cm_permission($cmid, $userid, $repo);
+                                            self::insert_cm_permission($cmid, $email, $repo);
                                     } else {
-                                        self::remove_cm_permission($cmid, $userid, $repo);
+                                        self::remove_cm_permission($cmid, $email, $repo);
                                     }
                                 }
                             } else {
                                 foreach ($userids as $userid) {
-                                    self::remove_cm_permission($cmid, $userid, $repo);
+                                    $email = self::get_google_authenticated_users_email($userid);
+                                    self::remove_cm_permission($cmid, $email, $repo);
                                 }
                             }
                         }
                     } else {
                         foreach ($cmids as $cmid) {
                             foreach ($userids as $userid) {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                $email = self::get_google_authenticated_users_email($userid);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     }
@@ -111,26 +114,29 @@ class repository_googledocs_observer {
                         if ($cm->visible == 1) {
                             rebuild_course_cache($courseid, true);
                             foreach ($userids as $userid) {
+                                $email = self::get_google_authenticated_users_email($userid);
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $cminfo = $modinfo->get_cm($cmid);
                                 $sectionnumber = self::get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    self::insert_cm_permission($cmid, $userid, $repo);
+                                    self::insert_cm_permission($cmid, $email, $repo);
                                 } else {
-                                    self::remove_cm_permission($cmid, $userid, $repo);
+                                    self::remove_cm_permission($cmid, $email, $repo);
                                 }
                             }
                         } else {
                             foreach ($userids as $userid) {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                $email = self::get_google_authenticated_users_email($userid);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     }
                 } else {
                     foreach ($cmids as $cmid) {
                         foreach ($userids as $userid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            $email = self::get_google_authenticated_users_email($userid);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                     }
                 }
@@ -141,7 +147,8 @@ class repository_googledocs_observer {
                 $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
                 foreach ($cms as $cm) {
                     foreach ($userids as $userid) {
-                        self::remove_cm_permission($cm->cmid, $userid, $repo);
+                        $email = self::get_google_authenticated_users_email($userid);
+                        self::remove_cm_permission($cm->cmid, $email, $repo);
                     }
                     $DB->delete_records('google_files_reference', array('cmid' => $cm->cmid));
                 }
@@ -159,19 +166,21 @@ class repository_googledocs_observer {
                         if ($cm->cmvisible == 1) {
                             rebuild_course_cache($courseid, true);
                             foreach ($userids as $userid) {
+                                $email = self::get_google_authenticated_users_email($userid);
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $cminfo = $modinfo->get_cm($cmid);
                                 $sectionnumber = self::get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    self::insert_cm_permission($cmid, $userid, $repo);
+                                    self::insert_cm_permission($cmid, $email, $repo);
                                 } else {
-                                    self::remove_cm_permission($cmid, $userid, $repo);
+                                    self::remove_cm_permission($cmid, $email, $repo);
                                 }
                             }
                         } else {
                             foreach ($userids as $userid) {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                $email = self::get_google_authenticated_users_email($userid);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     }
@@ -179,7 +188,8 @@ class repository_googledocs_observer {
                     foreach ($cms as $cm) {
                         $cmid = $cm->id;
                         foreach ($userids as $userid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            $email = self::get_google_authenticated_users_email($userid);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                     }
                 }
@@ -196,24 +206,27 @@ class repository_googledocs_observer {
                     if ($cm->visible == 1) {
                         rebuild_course_cache($courseid, true);
                         foreach ($userids as $userid) {
+                            $email = self::get_google_authenticated_users_email($userid);
                             $modinfo = get_fast_modinfo($courseid, $userid);
                             $sectionnumber = self::get_cm_sectionnum($cmid);
                             $secinfo = $modinfo->get_section_info($sectionnumber);
                             $cminfo = $modinfo->get_cm($cmid);
                             if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                self::insert_cm_permission($cmid, $userid, $repo);
+                                self::insert_cm_permission($cmid, $email, $repo);
                             } else {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     } else {
                         foreach ($userids as $userid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            $email = self::get_google_authenticated_users_email($userid);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                     }
                 } else {
                     foreach ($userids as $userid) {
-                        self::remove_cm_permission($cmid, $userid, $repo);
+                        $email = self::get_google_authenticated_users_email($userid);
+                        self::remove_cm_permission($cmid, $email, $repo);
                     }
                 }
 
@@ -238,24 +251,27 @@ class repository_googledocs_observer {
                     if ($cm->visible == 1) {
                         rebuild_course_cache($courseid, true);
                         foreach ($userids as $userid) {
+                            $email = self::get_google_authenticated_users_email($userid);
                             $modinfo = get_fast_modinfo($courseid, $userid);
                             $sectionnumber = self::get_cm_sectionnum($cmid);
                             $secinfo = $modinfo->get_section_info($sectionnumber);
                             $cminfo = $modinfo->get_cm($cmid);
                             if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                self::insert_cm_permission($cmid, $userid, $repo);
+                                self::insert_cm_permission($cmid, $email, $repo);
                             } else {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     } else {
                         foreach ($userids as $userid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            $email = self::get_google_authenticated_users_email($userid);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                     }
                 } else {
                     foreach ($userids as $userid) {
-                        self::remove_cm_permission($cmid, $userid, $repo);
+                        $email = self::get_google_authenticated_users_email($userid);
+                        self::remove_cm_permission($cmid, $email, $repo);
                     }
                 }
 
@@ -282,59 +298,75 @@ class repository_googledocs_observer {
                     $gcmid = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'id');
                     if ($gcmid) {
                         foreach ($userids as $userid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            $email = self::get_google_authenticated_users_email($userid);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                         $DB->delete_records('google_files_reference', array('cmid' => $cmid));
                     }
                 }
                 break;
-            case '\core\event\user_updated':
-                $userid = $event->objectid;
+            case '\repository_googledocs\event\google_refreshtokens_created':
+                $userid = $event->relateduserid;
                 $email = self::get_google_authenticated_users_email($userid);
-                if ($email) {
-                    $usercourses = self::get_user_courseids($userid);
-                    foreach ($usercourses as $usercourse) {
-                        $courseid = $usercourse->courseid;
-                        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
-                        $coursecontext = context_course::instance($courseid);
-                        $coursemodinfo = get_fast_modinfo($courseid, -1);
-                        $coursemods = $coursemodinfo->get_cms();
-                        $cms = array();
-                        $cmids = array();
-                        foreach ($coursemods as $cm) {
-                            if ($cm->modname == 'resource') {
-                                $cmids[] = $cm->id;
-                                $cms[] = $cm;
-                            }
-                        }
-                        if ($course->visible == 1) {
-                            foreach ($cms as $cm) {
-                                $cmid = $cm->id;
-                                if ($cm->visible == 1) {
-                                    rebuild_course_cache($courseid, true);
-                                    $modinfo = get_fast_modinfo($courseid, $userid);
-                                    $cminfo = $modinfo->get_cm($cmid);
-                                    $sectionnumber = self::get_cm_sectionnum($cmid);
-                                    $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    if ($cminfo->uservisible
-                                        && $secinfo->available
-                                        && is_enrolled($coursecontext, $userid, '', true)) {
-                                            self::insert_cm_permission($cmid, $userid, $repo);
-                                        } else {
-                                            self::remove_cm_permission($cmid, $userid, $repo);
-                                        }
-                                } else {
-                                    self::remove_cm_permission($cmid, $userid, $repo);
-                                }
-                            }
-                        } else {
-                            foreach ($cmids as $cmid) {
-                                self::remove_cm_permission($cmid, $userid, $repo);
-                            }
+                $usercourses = self::get_user_courseids($userid);
+                foreach ($usercourses as $usercourse) {
+                    $courseid = $usercourse->courseid;
+                    $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                    $coursecontext = context_course::instance($courseid);
+                    $coursemodinfo = get_fast_modinfo($courseid, -1);
+                    $coursemods = $coursemodinfo->get_cms();
+                    $cms = array();
+                    $cmids = array();
+                    foreach ($coursemods as $cm) {
+                        if ($cm->modname == 'resource') {
+                            $cmids[] = $cm->id;
+                            $cms[] = $cm;
                         }
                     }
-                } else {
-                    // Remove permission for gmail account disconnected?
+                    if ($course->visible == 1) {
+                        foreach ($cms as $cm) {
+                            $cmid = $cm->id;
+                            if ($cm->visible == 1) {
+                                rebuild_course_cache($courseid, true);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = self::get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible
+                                    && $secinfo->available
+                                    && is_enrolled($coursecontext, $userid, '', true)) {
+                                        self::insert_cm_permission($cmid, $email, $repo);
+                                    } else {
+                                        self::remove_cm_permission($cmid, $email, $repo);
+                                    }
+                            } else {
+                                self::remove_cm_permission($cmid, $email, $repo);
+                            }
+                        }
+                    } else {
+                        foreach ($cmids as $cmid) {
+                            self::remove_cm_permission($cmid, $email, $repo);
+                        }
+                    }
+                }
+                break;
+            case '\repository_googledocs\event\google_refreshtokens_deleted':
+                $eventdata = $event->get_record_snapshot('google_refreshtokens', $event->objectid);
+                $email = $eventdata->gmail;
+                $userid = $event->relateduserid;
+                $usercourses = self::get_user_courseids($userid);
+                foreach ($usercourses as $usercourse) {
+                    $courseid = $usercourse->courseid;
+                    $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                    $coursecontext = context_course::instance($courseid);
+                    $coursemodinfo = get_fast_modinfo($courseid, -1);
+                    $coursemods = $coursemodinfo->get_cms();
+                    $cmids = array();
+                    foreach ($coursemods as $cm) {
+                        if ($cm->modname == 'resource') {
+                            self::remove_cm_permission($cm->id, $email, $repo);
+                        }
+                    }
                 }
                 break;
             case '\core\event\user_enrolment_created':
@@ -367,17 +399,17 @@ class repository_googledocs_observer {
                                 if ($cminfo->uservisible
                                     && $secinfo->available
                                     && is_enrolled($coursecontext, $userid, '', true)) {
-                                        self::insert_cm_permission($cmid, $userid, $repo);
+                                        self::insert_cm_permission($cmid, $email, $repo);
                                     } else {
-                                        self::remove_cm_permission($cmid, $userid, $repo);
+                                        self::remove_cm_permission($cmid, $email, $repo);
                                     }
                             } else {
-                                self::remove_cm_permission($cmid, $userid, $repo);
+                                self::remove_cm_permission($cmid, $email, $repo);
                             }
                         }
                     } else {
                         foreach ($cmids as $cmid) {
-                            self::remove_cm_permission($cmid, $userid, $repo);
+                            self::remove_cm_permission($cmid, $email, $repo);
                         }
                     }
                 }
@@ -390,7 +422,7 @@ class repository_googledocs_observer {
                     $cms = $DB->get_records('google_files_reference', array('courseid' => $courseid), 'id', 'cmid');
                     foreach ($cms as $cm) {
                         $cmid = $cm->cmid;
-                        self::remove_cm_permission($cmid, $userid, $repo);
+                        self::remove_cm_permission($cmid, $email, $repo);
                     }
                 }
                 break;
@@ -560,9 +592,9 @@ class repository_googledocs_observer {
      * @param user id $userid
      * @param repo $repo
      */
-    private static function insert_cm_permission($cmid, $userid, $repo) {
+    private static function insert_cm_permission($cmid, $email, $repo) {
         global $DB;
-        $email = self::get_google_authenticated_users_email($userid);
+        //$email = self::get_google_authenticated_users_email($userid);
         $fileid = self::get_resource($cmid);
         if ($fileid) {
             $existing = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'reference');
@@ -591,12 +623,12 @@ class repository_googledocs_observer {
      * @param user id $userid
      * @param repo $repo
      */
-    private static function remove_cm_permission($cmid, $userid, $repo) {
+    private static function remove_cm_permission($cmid, $email, $repo) {
         global $DB;
-        $email = self::get_google_authenticated_users_email($userid);
+        //$email = self::get_google_authenticated_users_email($userid);
         $filerec = $DB->get_record('google_files_reference', array('cmid' => $cmid), 'reference');
-        $fileid = $filerec->reference;
-        if ($fileid) {
+        if ($filerec) {
+            $fileid = $filerec->reference;
             try {
                 $permissionid = $repo->print_permission_id_for_email($email);
                 $repo->remove_permission($fileid, $permissionid);
